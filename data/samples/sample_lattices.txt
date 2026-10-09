@@ -1,0 +1,170 @@
+Name: cub_Z06.0_E1
+Other name(s): cub_Z06.0_R399, sqc1, pcu, primitive cubic lattice
+
+Normalized unit cell parameters (a,b,c,alpha,beta,gamma):
+1.00000, 1.00000, 1.00000, 90.0, 90.0, 90.0
+
+Average connectivity: Z_avg = 6.00
+
+Effective normalized mechanical properties:
+Ex  = 3.34E-03, Ey  = 3.34E-03, Ez  = 3.34E-03
+Gyz = 5.31E-06, Gxz = 5.31E-06, Gxy = 5.31E-06
+nuyz = 0.000, nuxz = -0.000, nuxy = 0.000, nuzy = 0.000, nuzx = -0.000, nuyx = 0.000
+
+Scaling constants Cx = 0.33, Cy = 0.33, Cz = 0.33
+Scaling exponents nx = 1.00, ny = 1.00, nz = 1.00
+
+Nodal positions:
+0.00000 0.00000 0.00000
+0.00000 1.00000 0.00000
+1.00000 0.00000 0.00000
+1.00000 1.00000 0.00000
+0.00000 0.00000 1.00000
+0.00000 1.00000 1.00000
+1.00000 0.00000 1.00000
+1.00000 1.00000 1.00000
+
+Bar connectivities:
+1 5
+1 2
+1 3
+2 6
+2 4
+3 7
+3 4
+4 8
+5 6
+5 7
+6 8
+7 8
+
+
+-----------------------------------------------------------------------------------------
+Name: ort_Z08.0_E2
+Other name(s): sqc2
+
+Normalized unit cell parameters (a,b,c,alpha,beta,gamma):
+0.85075, 0.57449, 1.00000, 90.0, 90.0, 90.0
+
+Average connectivity: Z_avg = 8.00
+
+Effective normalized mechanical properties:
+Ex  = 2.19E-03, Ey  = 2.43E-04, Ez  = 2.56E-03
+Gyz = 1.16E-06, Gxz = 2.19E-06, Gxy = 1.13E-03
+nuyz = -0.000, nuxz = 0.000, nuxy = 2.185, nuzy = -0.000, nuzx = 0.000, nuyx = 0.242
+
+Max. overall stiffness not along x-, y-, or z-direction. Emax = 3.62E-03
+
+Scaling constants Cx = 0.23, Cy = 0.03, Cz = 0.26
+Scaling exponents nx = 1.01, ny = 1.01, nz = 1.00
+
+This structure has overlapping or intersecting bars.
+
+Nodal positions:
+0.00000 0.00000 0.00000
+0.00000 1.00000 0.00000
+1.00000 0.00000 0.00000
+1.00000 1.00000 0.00000
+0.00000 0.00000 1.00000
+0.00000 1.00000 1.00000
+1.00000 0.00000 1.00000
+1.00000 1.00000 1.00000
+
+Bar connectivities:
+1 4
+1 5
+1 3
+2 3
+2 6
+2 4
+3 7
+4 8
+5 8
+5 7
+6 7
+6 8
+
+-----------------------------------------------------------------------------------------
+Name: cub_Z08.0_E3
+Other name(s): cub_Z08.0_R622, sqc3, bcu, body-centered cubic, 8/4/c1
+
+Normalized unit cell parameters (a,b,c,alpha,beta,gamma):
+1.00000, 1.00000, 1.00000, 90.0, 90.0, 90.0
+
+Average connectivity: Z_avg = 8.00
+
+Effective normalized mechanical properties:
+Ex  = 9.18E-06, Ey  = 9.18E-06, Ez  = 9.18E-06
+Gyz = 1.11E-03, Gxz = 1.11E-03, Gxy = 1.11E-03
+nuyz = 0.499, nuxz = 0.499, nuxy = 0.499, nuzy = 0.499, nuzx = 0.499, nuyx = 0.499
+
+Max. overall stiffness not along x-, y-, or z-direction. Emax = 2.50E-03
+
+Scaling constants Cx = 0.09, Cy = 0.09, Cz = 0.09
+Scaling exponents nx = 2.00, ny = 2.00, nz = 2.00
+
+Nodal positions:
+0.00000 0.00000 0.00000
+0.00000 1.00000 0.00000
+1.00000 0.00000 0.00000
+1.00000 1.00000 0.00000
+0.00000 0.00000 1.00000
+0.00000 1.00000 1.00000
+1.00000 0.00000 1.00000
+0.50000 0.50000 0.50000
+1.00000 1.00000 1.00000
+
+Bar connectivities:
+1 8
+5 8
+2 8
+3 8
+6 8
+7 8
+4 8
+8 9
+
+-----------------------------------------------------------------------------------------
+Name: hex_Z08.0_E4
+Other name(s): hex_Z08.0_R626, sqc4, hexagonal primitive hex
+
+Normalized unit cell parameters (a,b,c,alpha,beta,gamma):
+0.99471, 0.99471, 1.00000, 90.0, 90.0, 120.0
+
+Average connectivity: Z_avg = 8.00
+
+Effective normalized mechanical properties:
+Ex  = 2.50E-03, Ey  = 2.50E-03, Ez  = 2.51E-03
+Gyz = 3.10E-06, Gxz = 3.10E-06, Gxy = 9.38E-04
+nuyz = -0.000, nuxz = 0.000, nuxy = 0.332, nuzy = -0.000, nuzx = 0.000, nuyx = 0.332
+
+Scaling constants Cx = 0.25, Cy = 0.25, Cz = 0.25
+Scaling exponents nx = 1.00, ny = 1.00, nz = 1.00
+
+Nodal positions:
+0.00000 0.00000 0.00000
+0.00000 1.00000 0.00000
+1.00000 0.00000 0.00000
+1.00000 1.00000 0.00000
+0.00000 0.00000 1.00000
+0.00000 1.00000 1.00000
+1.00000 0.00000 1.00000
+1.00000 1.00000 1.00000
+
+Bar connectivities:
+1 5
+1 2
+1 3
+1 4
+2 6
+2 4
+3 7
+3 4
+4 8
+5 6
+5 7
+5 8
+6 8
+7 8
+
+-----------------------------------------------------------------------------------------

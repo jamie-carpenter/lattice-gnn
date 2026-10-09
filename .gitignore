@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# lattice-gnn: full datasets and training outputs (small examples in data/samples/ are committed)
+data/raw/
+data/processed/
+checkpoints/
+runs/
+plots/
+*.pt
+*.pth

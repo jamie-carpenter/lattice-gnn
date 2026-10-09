@@ -1,0 +1,10 @@
+# Python 3.12 (PyTorch does not support 3.15 yet).
+#
+# CPU-only (laptop):
+#   pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+# NVIDIA GPU (e.g. AWS): install torch first using the command from
+#   https://pytorch.org/get-started/locally/  then  pip install -r requirements.txt
+numpy==2.5.3
+torch==2.14.1
+torch_geometric==2.8.0.post1
+plotly==7.1.0
