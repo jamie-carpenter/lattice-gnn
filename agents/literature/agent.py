@@ -11,19 +11,28 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import os
 import sys
+from datetime import datetime, timezone
+from importlib.metadata import version
 from pathlib import Path
 
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    ClaudeSDKError,
     ResultMessage,
     TextBlock,
     ToolUseBlock,
     query,
 )
 
+from dotenv import load_dotenv
+
 from .tools import TOOL_NAMES, build_server
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_TOPIC = (
     "Machine-learning surrogates (especially graph neural networks) that predict the effective "
@@ -131,21 +140,40 @@ def _short(d: dict, n: int = 110) -> str:
 async def run(topic: str, out_dir: Path, model: str, max_turns: int, budget: float) -> int:
     options = build_options(out_dir.resolve(), model, max_turns, budget)
     prompt = f"Conduct a literature review on:\n\n{topic}"
+    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    models_used: set[str] = set()
+    exit_code = 1
+    # Consume the whole stream (no early return), so the SDK can shut down cleanly.
     async for msg in query(prompt=prompt, options=options):
         if isinstance(msg, AssistantMessage):
+            models_used.add(msg.model)
             for block in msg.content:
                 if isinstance(block, TextBlock) and block.text.strip():
                     print(f"\n{block.text.strip()}\n", flush=True)
                 elif isinstance(block, ToolUseBlock):
                     print(f"  -> {block.name.removeprefix('mcp__literature__')}({_short(block.input)})", flush=True)
         elif isinstance(msg, ResultMessage):
+            # API failures (bad key, no credit) arrive as subtype "success" with the cause in terminal_reason.
+            failed = msg.is_error or "error" in (msg.terminal_reason or "")
             cost = f"${msg.total_cost_usd:.2f}" if msg.total_cost_usd is not None else "n/a"
-            print(f"\n[{msg.subtype}] turns={msg.num_turns} cost={cost} "
+            status = f"FAILED: {msg.terminal_reason or msg.subtype}" if failed else msg.subtype
+            print(f"\n[{status}] turns={msg.num_turns} cost={cost} "
                   f"time={msg.duration_ms / 1000:.0f}s -> {out_dir}")
             if msg.errors:
                 print("errors:", *msg.errors, sep="\n  ")
-            return 1 if msg.is_error else 0
-    return 1
+            # Pin the model ID and run settings beside the results, so the run can be reproduced.
+            run_info = {
+                "started_utc": started, "topic": topic,
+                "model_requested": model, "models_used": sorted(models_used),
+                "claude_agent_sdk": version("claude-agent-sdk"),
+                "max_turns": max_turns, "budget_usd": budget,
+                "outcome": msg.subtype, "terminal_reason": msg.terminal_reason, "turns": msg.num_turns,
+                "cost_usd": msg.total_cost_usd, "duration_s": round(msg.duration_ms / 1000),
+                "session_id": msg.session_id, "errors": msg.errors,
+            }
+            (out_dir / "run_info.json").write_text(json.dumps(run_info, indent=2), "utf-8")
+            exit_code = 1 if failed else 0
+    return exit_code
 
 
 def main() -> None:
@@ -157,4 +185,13 @@ def main() -> None:
     p.add_argument("--budget", type=float, default=10.0, help="stop once API spend reaches this many USD")
     args = p.parse_args()
     sys.stdout.reconfigure(errors="replace")  # Windows consoles can't print every symbol in paper text
-    sys.exit(asyncio.run(run(args.topic, args.out, args.model, args.max_turns, args.budget)))
+    load_dotenv(REPO_ROOT / ".env")  # ANTHROPIC_API_KEY lives in .env (git-ignored), never in code
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_CODE_USE_BEDROCK")):
+        sys.exit(f"No model access: put ANTHROPIC_API_KEY=... in {REPO_ROOT / '.env'} "
+                 "(or set CLAUDE_CODE_USE_BEDROCK=1 with AWS credentials).")
+    try:
+        code = asyncio.run(run(args.topic, args.out, args.model, args.max_turns, args.budget))
+    except ClaudeSDKError as e:  # raised after a failed result, which run() has already reported
+        print(f"error: {e}", file=sys.stderr)
+        code = 1
+    sys.exit(code)
