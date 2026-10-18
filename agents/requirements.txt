@@ -1,2 +1,3 @@
 # Agents only (the model itself uses ../requirements.txt).
 claude-agent-sdk==0.2.168
+pypdf==6.21.1

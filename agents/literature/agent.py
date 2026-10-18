@@ -38,35 +38,64 @@ by the user (a graduate student) and by later agents that will choose the archit
 add manufacturing defects.
 
 ## The project
-- Input: a periodic strut lattice unit cell, represented as a graph (nodes = strut junctions,
-  edges = struts with length and direction features; periodic boundary edges included).
-- Model: message-passing GNN updating both nodes and struts, mean+max pooling, MLP head.
-- Output: 9 orthotropic stiffness components (C11, C22, C33, C12, C13, C23, C44, C55, C66),
-  standardized; labels come from homogenization.
-- Later: imperfections such as strut-diameter variation, waviness, missing struts, porosity,
-  and node misplacement, and their effect on stiffness.
+- Dataset (already chosen): text records, one per lattice, with names like `cub_Z06.0_E1` and
+  `ort_Z08.0_E2` (crystal system + average connectivity Z), alternative names including RCSR net
+  symbols (e.g. `pcu`), normalized cell parameters, nodal positions and bar connectivities, and
+  "effective normalized mechanical properties" (Ex, Ey, Ez, Gyz, Gxz, Gxy, six Poisson's ratios)
+  plus scaling constants C and exponents n per direction (E/Es = C * rho_rel^n).
+  It may be the crystal-network lattice dataset of Lumpe & Stankovic (PNAS, 2021), but VERIFY this
+  from the paper itself; do not assume it.
+- Units and conventions:
+  - Geometry is dimensionless. Node positions are fractional coordinates, cell lengths are
+    normalized so the longest is 1, angles are in degrees, and strut lengths are in cell units.
+    Strut thickness is not an input.
+  - Moduli are dimensionless, normalized by the base material's Young's modulus Es. The listed
+    values look like slender-strut results at relative density about 1% (consistent with
+    E/Es = C * rho_rel^n). Treat that as unconfirmed.
+- Model: message-passing GNN on the periodic graph (nodes = strut junctions, edges = struts with
+  length/direction features, periodic edges included), updating nodes and struts, mean+max pooling,
+  MLP head. Graph-level inputs: Z_avg and log10(total strut length / cell volume).
+- Targets (9 orthotropic constants, standardized): log10 of Ex, Ey, Ez, Gyz, Gxz, Gxy, plus three
+  Poisson coupling terms (yz, xz, xy). The model predicts engineering constants, not the C_ij
+  stiffness matrix directly; the 6x6 orthotropic matrix is assembled from them.
+- Later: manufacturing defects (strut-diameter variation, waviness, missing struts, porosity,
+  node misplacement) and how they reduce stiffness.
 
 ## How to work
 1. Plan 6-10 distinct search angles first (surrogates for lattice/metamaterial elasticity; GNNs for
    periodic structures and crystals; datasets; tensor symmetry/equivariance; homogenization methods;
    defects and as-built vs as-designed stiffness; inverse design).
-2. Search with BOTH search_openalex and search_arxiv. Rephrase when results are poor.
-3. Pick 3-5 seminal or highly relevant papers and snowball with get_paper_links, using both
+2. Identify the source paper of OUR dataset and record it (category "dataset"). Then use
+   get_paper_links(direction="citations") on it to find papers that trained ML models on the same
+   data. Their reported errors are our baselines, so note the metric, the split, and whether they
+   predict log-moduli, normalized moduli or C_ij.
+3. Search with BOTH search_openalex and search_arxiv. Rephrase when results are poor.
+4. Pick 3-5 seminal or highly relevant papers and snowball with get_paper_links, using both
    citations and references.
-4. Use WebFetch on a paper page only when the abstract is too thin to judge methods or results.
-   Use WebSearch for things the paper APIs miss, such as dataset repositories or code.
-5. Call record_paper for each paper that is genuinely relevant. Aim for 25-40 papers, with relevance
-   scores that discriminate (most should not be 5).
-6. Finish with write_review. Sections:
-   Overview; Datasets; Model architectures (with a comparison table: paper, representation, model,
-   targets, data size, reported accuracy); Enforcing tensor symmetry and physical constraints;
+5. For every paper you rate relevance 4-5 (and the dataset paper), read the full text with read_pdf
+   using its pdf_url: pages 1-3 first, then the methods/results pages. For the rest, the abstract
+   is enough. If no open-access PDF exists, try WebSearch for an arXiv or author copy; otherwise
+   mark it "abstract only".
+6. Call record_paper for each genuinely relevant paper, with an `evidence` entry (page + location +
+   short quote) for every specific claim you will make about it. Aim for 25-40 papers, with
+   relevance scores that discriminate (most should not be 5).
+7. Finish with write_review. Sections:
+   Overview; Our dataset (source, how labels were computed, assumptions such as relative density
+   and strut model, known limitations); Other datasets; Model architectures (comparison table:
+   paper, representation, model, targets and their units/normalization, data size, reported
+   accuracy, page); Baselines on our dataset; Enforcing tensor symmetry and physical constraints;
    Label generation / homogenization; Manufacturing defects; Gaps and recommendations for this
-   project; References.
+   project; References (include the PDF version read for each paper).
 
 ## Rules
 - Never cite or record a paper that a tool did not return. Do not invent DOIs, numbers or authors.
+- Cite every specific claim with its exact location: [Author Year, p. N] or
+  [Author Year, p. N, Table 2], where N is the PDF page from read_pdf, and the evidence entry holds
+  the supporting quote. If you only read the abstract, cite [Author Year, abstract]. Never give a
+  page number you did not read.
+- When comparing reported accuracies, state each paper's units and normalization (absolute GPa,
+  E/Es, log scale, relative density). Do not compare numbers across different conventions.
 - If a detail is unknown, say so rather than guessing.
-- Keep claims attributable: every factual claim in the review cites a recorded paper.
 """
 
 
@@ -89,7 +118,8 @@ def build_options(out_dir: Path, model: str, max_turns: int, budget: float) -> C
 
 def _short(d: dict, n: int = 110) -> str:
     s = ", ".join(f"{k}={v!r}" for k, v in d.items() if k not in ("markdown", "summary", "methods",
-                                                                 "data", "key_findings", "relevance_to_project"))
+                                                                 "data", "key_findings", "relevance_to_project",
+                                                                 "evidence"))
     return s if len(s) <= n else s[:n] + "…"
 
 
@@ -119,6 +149,7 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("literature_review"))
     p.add_argument("--model", default="claude-sonnet-5-5")
     p.add_argument("--max-turns", type=int, default=120)
-    p.add_argument("--budget", type=float, default=5.0, help="stop once API spend reaches this many USD")
+    p.add_argument("--budget", type=float, default=10.0, help="stop once API spend reaches this many USD")
     args = p.parse_args()
+    sys.stdout.reconfigure(errors="replace")  # Windows consoles can't print every symbol in paper text
     sys.exit(asyncio.run(run(args.topic, args.out, args.model, args.max_turns, args.budget)))

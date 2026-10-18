@@ -3,6 +3,7 @@
   search_arxiv            arXiv API (preprints; good for recent ML work)
   search_openalex         OpenAlex (journals + preprints, with citation counts)
   get_paper_links         papers that cite / are cited by a given paper (snowballing)
+  read_pdf                full text of an open-access PDF, split by page (for page citations)
   record_paper            append a structured entry to papers.json
   write_review            write the final lit_review.md
 
@@ -21,14 +22,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
+from pypdf import PdfReader
 
 USER_AGENT = "lattice-gnn-literature-agent/0.1"
 OPENALEX = "https://api.openalex.org"
-OA_FIELDS = "id,doi,title,publication_year,authorships,primary_location,cited_by_count,abstract_inverted_index"
+OA_FIELDS = "id,doi,title,publication_year,authorships,primary_location,cited_by_count,abstract_inverted_index,best_oa_location"
 ARXIV_NS = {"a": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 
 CATEGORIES = [
@@ -47,10 +50,17 @@ CATEGORIES = [
 
 _rate_lock = threading.Lock()
 _last_call: dict[str, float] = {}
-_MIN_SPACING = {"arxiv": 3.0, "openalex": 0.2}  # seconds between calls, per the APIs' guidance
+_MIN_SPACING = {"arxiv": 3.0, "openalex": 0.2, "pdf": 1.0}  # seconds between calls, per the APIs' guidance
+
+
+MAX_PDF_BYTES = 40 * 1024 * 1024
 
 
 def _http_get(url: str, api: str, headers: dict[str, str] | None = None, retries: int = 4) -> str:
+    return _http_fetch(url, api, headers, retries).decode("utf-8")
+
+
+def _http_fetch(url: str, api: str, headers: dict[str, str] | None = None, retries: int = 4) -> bytes:
     """GET with per-API spacing and exponential backoff on 429 / 5xx."""
     for attempt in range(retries):
         with _rate_lock:
@@ -60,8 +70,11 @@ def _http_get(url: str, api: str, headers: dict[str, str] | None = None, retries
             _last_call[api] = time.monotonic()
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return resp.read().decode("utf-8")
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                body = resp.read(MAX_PDF_BYTES + 1)
+                if len(body) > MAX_PDF_BYTES:
+                    raise ValueError("response larger than 40 MB")
+                return body
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
                 time.sleep(2.0 * 2**attempt)
@@ -114,6 +127,7 @@ def _arxiv_search(query: str, max_results: int) -> list[dict[str, Any]]:
             "category": cat.get("term") if cat is not None else None,
             "doi": e.findtext("arxiv:doi", None, ARXIV_NS),
             "url": f"https://arxiv.org/abs/{arxiv_id}",
+            "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}",
             "abstract": _clip(e.findtext("a:summary", "", ARXIV_NS)),
         })
     return out
@@ -137,6 +151,7 @@ def _oa_paper(w: dict[str, Any]) -> dict[str, Any]:
         "venue": source.get("display_name"),
         "citations": w.get("cited_by_count"),
         "doi": (w.get("doi") or "").removeprefix("https://doi.org/") or None,
+        "pdf_url": (w.get("best_oa_location") or {}).get("pdf_url"),
         "abstract": _abstract(w.get("abstract_inverted_index")),
     }
 
@@ -170,6 +185,29 @@ def _oa_links(paper_id: str, direction: str, limit: int) -> list[dict[str, Any]]
     return [_oa_paper(w) for w in _openalex("/works", params).get("results") or []]
 
 
+MAX_PAGES_PER_CALL = 8
+_pdf_cache: dict[str, list[str]] = {}
+
+
+def _pdf_pages(url: str, first: int, last: int) -> str:
+    """Text of pages first..last (1-based PDF page numbers), each under a page marker."""
+    if not url.startswith(("https://", "http://")):
+        raise ValueError("url must be http(s)")
+    if url not in _pdf_cache:
+        data = _http_fetch(url, "arxiv" if "arxiv.org" in url else "pdf", {"Accept": "application/pdf"})
+        if not data.startswith(b"%PDF"):
+            raise ValueError("not a PDF (probably a paywall or landing page); use the abstract instead")
+        _pdf_cache[url] = [page.extract_text() or "" for page in PdfReader(BytesIO(data)).pages]
+    pages = _pdf_cache[url]
+    first = max(1, first)
+    last = min(len(pages), last, first + MAX_PAGES_PER_CALL - 1)
+    parts = [f"[{url}: PDF has {len(pages)} pages; showing {first}-{last}]"]
+    for i in range(first, last + 1):
+        text = " ".join(pages[i - 1].split())
+        parts.append(f"\n=== PDF page {i} ===\n{text[:9000]}")
+    return "\n".join(parts)
+
+
 # --------------------------------------------------------------------------- server
 
 RECORD_SCHEMA = {
@@ -189,8 +227,26 @@ RECORD_SCHEMA = {
         "data": {"type": "string", "description": "dataset, size, how labels were generated"},
         "key_findings": {"type": "string", "description": "quantitative results where available"},
         "relevance_to_project": {"type": "string", "description": "what we should take from it"},
+        "fulltext_source": {"type": "string",
+                            "description": "PDF url read with read_pdf (page numbers refer to this version), "
+                                           "or 'abstract only'"},
+        "evidence": {
+            "type": "array",
+            "description": "Pinpointed support for each specific claim you will make about this paper",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "claim": {"type": "string"},
+                    "page": {"type": "integer", "description": "PDF page number from read_pdf; omit if abstract only"},
+                    "location": {"type": "string", "description": "e.g. 'Table 2', 'Fig. 4', 'Sec. 3.1', 'abstract'"},
+                    "quote": {"type": "string", "description": "short verbatim snippet, at most 25 words"},
+                },
+                "required": ["claim", "location"],
+            },
+        },
     },
-    "required": ["title", "authors", "year", "identifier", "category", "relevance", "summary", "relevance_to_project"],
+    "required": ["title", "authors", "year", "identifier", "category", "relevance", "summary", "relevance_to_project",
+                 "fulltext_source", "evidence"],
 }
 
 
@@ -250,6 +306,26 @@ def build_server(out_dir: Path):
             return _err(f"Lookup failed for {args['paper_id']}: {e}")
 
     @tool(
+        "read_pdf",
+        "Read an open-access PDF (a pdf_url from a search result) page by page. Each page's text "
+        f"comes under a '=== PDF page N ===' marker; at most {MAX_PAGES_PER_CALL} pages per call. "
+        "Start with pages 1-3, then jump to the methods/results pages you need. Page numbers are "
+        "PDF pages of this specific version, which can differ from the journal's printed numbers.",
+        {"type": "object",
+         "properties": {"url": {"type": "string"},
+                        "first_page": {"type": "integer", "minimum": 1, "default": 1},
+                        "last_page": {"type": "integer", "minimum": 1, "default": 3}},
+         "required": ["url"]},
+    )
+    async def read_pdf(args):
+        try:
+            return _ok(await asyncio.to_thread(_pdf_pages, args["url"], args.get("first_page", 1),
+                                               args.get("last_page", 3)))
+        except Exception as e:
+            return _err(f"Could not read PDF {args['url']}: {e}. Publishers often block automated "
+                        "downloads; look for an arXiv or author copy, otherwise cite the abstract only.")
+
+    @tool(
         "record_paper",
         "Add one relevant paper to the bibliography (papers.json). Only record papers that a search "
         "tool actually returned. Recording the same identifier again replaces the earlier entry.",
@@ -276,8 +352,8 @@ def build_server(out_dir: Path):
     return create_sdk_mcp_server(
         name="literature",
         version="0.1.0",
-        tools=[search_arxiv, search_openalex, get_paper_links, record_paper, write_review],
+        tools=[search_arxiv, search_openalex, get_paper_links, read_pdf, record_paper, write_review],
     )
 
 
-TOOL_NAMES = ["search_arxiv", "search_openalex", "get_paper_links", "record_paper", "write_review"]
+TOOL_NAMES = ["search_arxiv", "search_openalex", "get_paper_links", "read_pdf", "record_paper", "write_review"]
