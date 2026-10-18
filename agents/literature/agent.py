@@ -49,9 +49,10 @@ add manufacturing defects.
   - Geometry is dimensionless. Node positions are fractional coordinates, cell lengths are
     normalized so the longest is 1, angles are in degrees, and strut lengths are in cell units.
     Strut thickness is not an input.
-  - Moduli are dimensionless, normalized by the base material's Young's modulus Es. The listed
-    values look like slender-strut results at relative density about 1% (consistent with
-    E/Es = C * rho_rel^n). Treat that as unconfirmed.
+  - Moduli are dimensionless, normalized by the base material's Young's modulus Es. Solving
+    E/Es = C * rho_rel^n for each sample record gives rho_rel = 1.0% every time, including a
+    bending-dominated lattice (n = 2), so the listed moduli appear to be at 1% relative density.
+    Confirm this, and the strut model used (beam theory, cross-section), in the dataset paper.
 - Model: message-passing GNN on the periodic graph (nodes = strut junctions, edges = struts with
   length/direction features, periodic edges included), updating nodes and struts, mean+max pooling,
   MLP head. Graph-level inputs: Z_avg and log10(total strut length / cell volume).
