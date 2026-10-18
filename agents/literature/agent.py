@@ -1,197 +1,122 @@
-"""Literature-review agent for the lattice-GNN project (Claude Agent SDK).
+"""Run the literature-review agent non-interactively through Claude Code (`claude -p`).
+
+Uses your Claude Code sign-in (the course's Claude Enterprise seat), so there is no API key.
+The agent is defined in .claude/agents/literature-reviewer.md and its tools in server.py.
+For an interactive run instead, start `claude` in the repo and type: /literature-review [topic]
 
 Run from the repo root:
-    python -m agents.literature                       # default topic
-    python -m agents.literature "defects in additively manufactured lattices" --out literature_review/defects
+    python -m agents.literature                                  # default topic -> literature_review/main/
+    python -m agents.literature "defects in AM strut lattices" --name defects
 
-Writes <out>/papers.json (structured bibliography for downstream agents) and
-<out>/lit_review.md (the written review).
+Writes literature_review/<name>/: papers.json, lit_review.md, and run_info.json (pinned model ID,
+Claude Code version, turns, outcome), so each run can be audited and repeated.
 """
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
-import os
+import re
+import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
-from importlib.metadata import version
 from pathlib import Path
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ClaudeSDKError,
-    ResultMessage,
-    TextBlock,
-    ToolUseBlock,
-    query,
-)
-
-from dotenv import load_dotenv
-
-from .tools import TOOL_NAMES, build_server
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
-
-DEFAULT_TOPIC = (
-    "Machine-learning surrogates (especially graph neural networks) that predict the effective "
-    "elastic stiffness tensor of periodic truss/strut lattice unit cells, plus the datasets and "
-    "homogenization methods used to train them, and how manufacturing defects change lattice stiffness."
-)
-
-SYSTEM_PROMPT = """\
-You are the literature-review agent in a multi-agent system that designs and tunes a neural network
-for predicting the effective stiffness tensor of architected lattice unit cells. Your output is read
-by the user (a graduate student) and by later agents that will choose the architecture, tune it, and
-add manufacturing defects.
-
-## The project
-- Dataset (already chosen): text records, one per lattice, with names like `cub_Z06.0_E1` and
-  `ort_Z08.0_E2` (crystal system + average connectivity Z), alternative names including RCSR net
-  symbols (e.g. `pcu`), normalized cell parameters, nodal positions and bar connectivities, and
-  "effective normalized mechanical properties" (Ex, Ey, Ez, Gyz, Gxz, Gxy, six Poisson's ratios)
-  plus scaling constants C and exponents n per direction (E/Es = C * rho_rel^n).
-  It may be the crystal-network lattice dataset of Lumpe & Stankovic (PNAS, 2021), but VERIFY this
-  from the paper itself; do not assume it.
-- Units and conventions:
-  - Geometry is dimensionless. Node positions are fractional coordinates, cell lengths are
-    normalized so the longest is 1, angles are in degrees, and strut lengths are in cell units.
-    Strut thickness is not an input.
-  - Moduli are dimensionless, normalized by the base material's Young's modulus Es. Solving
-    E/Es = C * rho_rel^n across the full catalog (17,221 lattices) gives a median rho_rel of
-    1.00% (98% between 0.90% and 1.12%), for both stretching- (n ~ 1) and bending-dominated
-    (n ~ 2) lattices, so the listed moduli appear to be at 1% relative density; the scatter fits
-    C and n being power-law fits printed to 2 decimals. Confirm this, how C and n were fitted,
-    and the strut model used (beam theory, cross-section), in the dataset paper.
-- The catalog has 17,262 lattices. 41 are marked "very small members ... excluded from the main
-  manuscript" and have no properties. Find out how the authors handled them.
-- Model: message-passing GNN on the periodic graph (nodes = strut junctions, edges = struts with
-  length/direction features, periodic edges included), updating nodes and struts, mean+max pooling,
-  MLP head. Graph-level inputs: Z_avg and log10(total strut length / cell volume).
-- Targets (9 orthotropic constants, standardized): log10 of Ex, Ey, Ez, Gyz, Gxz, Gxy, plus three
-  Poisson coupling terms (yz, xz, xy). The model predicts engineering constants, not the C_ij
-  stiffness matrix directly; the 6x6 orthotropic matrix is assembled from them.
-- Later: manufacturing defects (strut-diameter variation, waviness, missing struts, porosity,
-  node misplacement) and how they reduce stiffness.
-
-## How to work
-1. Plan 6-10 distinct search angles first (surrogates for lattice/metamaterial elasticity; GNNs for
-   periodic structures and crystals; datasets; tensor symmetry/equivariance; homogenization methods;
-   defects and as-built vs as-designed stiffness; inverse design).
-2. Identify the source paper of OUR dataset and record it (category "dataset"). Then use
-   get_paper_links(direction="citations") on it to find papers that trained ML models on the same
-   data. Their reported errors are our baselines, so note the metric, the split, and whether they
-   predict log-moduli, normalized moduli or C_ij.
-3. Search with BOTH search_openalex and search_arxiv. Rephrase when results are poor.
-4. Pick 3-5 seminal or highly relevant papers and snowball with get_paper_links, using both
-   citations and references.
-5. For every paper you rate relevance 4-5 (and the dataset paper), read the full text with read_pdf
-   using its pdf_url: pages 1-3 first, then the methods/results pages. For the rest, the abstract
-   is enough. If no open-access PDF exists, try WebSearch for an arXiv or author copy; otherwise
-   mark it "abstract only".
-6. Call record_paper for each genuinely relevant paper, with an `evidence` entry (page + location +
-   short quote) for every specific claim you will make about it. Aim for 25-40 papers, with
-   relevance scores that discriminate (most should not be 5).
-7. Finish with write_review. Sections:
-   Overview; Our dataset (source, how labels were computed, assumptions such as relative density
-   and strut model, known limitations); Other datasets; Model architectures (comparison table:
-   paper, representation, model, targets and their units/normalization, data size, reported
-   accuracy, page); Baselines on our dataset; Enforcing tensor symmetry and physical constraints;
-   Label generation / homogenization; Manufacturing defects; Gaps and recommendations for this
-   project; References (include the PDF version read for each paper).
-
-## Rules
-- Never cite or record a paper that a tool did not return. Do not invent DOIs, numbers or authors.
-- Cite every specific claim with its exact location: [Author Year, p. N] or
-  [Author Year, p. N, Table 2], where N is the PDF page from read_pdf, and the evidence entry holds
-  the supporting quote. If you only read the abstract, cite [Author Year, abstract]. Never give a
-  page number you did not read.
-- When comparing reported accuracies, state each paper's units and normalization (absolute GPa,
-  E/Es, log scale, relative density). Do not compare numbers across different conventions.
-- If a detail is unknown, say so rather than guessing.
-"""
-
-
-def build_options(out_dir: Path, model: str, max_turns: int, budget: float) -> ClaudeAgentOptions:
-    return ClaudeAgentOptions(
-        system_prompt=SYSTEM_PROMPT,
-        model=model,
-        mcp_servers={"literature": build_server(out_dir)},
-        # Built-in tools available to the agent: web only. No shell, no file editing;
-        # it can only write files through record_paper / write_review into out_dir.
-        tools=["WebSearch", "WebFetch"],
-        allowed_tools=["WebSearch", "WebFetch"] + [f"mcp__literature__{t}" for t in TOOL_NAMES],
-        permission_mode="dontAsk",
-        setting_sources=[],  # ignore user/project Claude Code settings so runs are reproducible
-        cwd=str(out_dir),
-        max_turns=max_turns,
-        max_budget_usd=budget,
-    )
+SERVER = Path(__file__).with_name("server.py")
+DEFAULT_MODEL = "claude-sonnet-5-5"
 
 
 def _short(d: dict, n: int = 110) -> str:
-    s = ", ".join(f"{k}={v!r}" for k, v in d.items() if k not in ("markdown", "summary", "methods",
-                                                                 "data", "key_findings", "relevance_to_project",
-                                                                 "evidence"))
+    skip = ("markdown", "summary", "methods", "data", "key_findings", "relevance_to_project", "evidence")
+    s = ", ".join(f"{k}={v!r}" for k, v in d.items() if k not in skip)
     return s if len(s) <= n else s[:n] + "…"
 
 
-async def run(topic: str, out_dir: Path, model: str, max_turns: int, budget: float) -> int:
-    options = build_options(out_dir.resolve(), model, max_turns, budget)
-    prompt = f"Conduct a literature review on:\n\n{topic}"
-    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    models_used: set[str] = set()
-    exit_code = 1
-    # Consume the whole stream (no early return), so the SDK can shut down cleanly.
-    async for msg in query(prompt=prompt, options=options):
-        if isinstance(msg, AssistantMessage):
-            models_used.add(msg.model)
-            for block in msg.content:
-                if isinstance(block, TextBlock) and block.text.strip():
-                    print(f"\n{block.text.strip()}\n", flush=True)
-                elif isinstance(block, ToolUseBlock):
-                    print(f"  -> {block.name.removeprefix('mcp__literature__')}({_short(block.input)})", flush=True)
-        elif isinstance(msg, ResultMessage):
-            # API failures (bad key, no credit) arrive as subtype "success" with the cause in terminal_reason.
-            failed = msg.is_error or "error" in (msg.terminal_reason or "")
-            cost = f"${msg.total_cost_usd:.2f}" if msg.total_cost_usd is not None else "n/a"
-            status = f"FAILED: {msg.terminal_reason or msg.subtype}" if failed else msg.subtype
-            print(f"\n[{status}] turns={msg.num_turns} cost={cost} "
-                  f"time={msg.duration_ms / 1000:.0f}s -> {out_dir}")
-            if msg.errors:
-                print("errors:", *msg.errors, sep="\n  ")
-            # Pin the model ID and run settings beside the results, so the run can be reproduced.
-            run_info = {
-                "started_utc": started, "topic": topic,
-                "model_requested": model, "models_used": sorted(models_used),
-                "claude_agent_sdk": version("claude-agent-sdk"),
-                "max_turns": max_turns, "budget_usd": budget,
-                "outcome": msg.subtype, "terminal_reason": msg.terminal_reason, "turns": msg.num_turns,
-                "cost_usd": msg.total_cost_usd, "duration_s": round(msg.duration_ms / 1000),
-                "session_id": msg.session_id, "errors": msg.errors,
-            }
-            (out_dir / "run_info.json").write_text(json.dumps(run_info, indent=2), "utf-8")
-            exit_code = 1 if failed else 0
-    return exit_code
+def build_command(claude: str, topic: str | None, name: str, model: str, max_turns: int) -> list[str]:
+    # Use this interpreter for the tool server, so the run does not depend on PATH or an active venv.
+    mcp_config = {"mcpServers": {"literature": {"type": "stdio", "command": sys.executable, "args": [str(SERVER)]}}}
+    prompt = f"Folder name: {name}\nTopic: {topic or '(none given: use your default topic)'}\n" \
+             "Conduct the literature review."
+    return [
+        claude, "-p", prompt,
+        "--agent", "literature-reviewer",          # tools + instructions from .claude/agents/
+        "--model", model,                          # pinned model ID
+        "--max-turns", str(max_turns),
+        "--output-format", "stream-json", "--verbose",
+        "--mcp-config", json.dumps(mcp_config), "--strict-mcp-config",
+        # Fixed tool surface: anything not listed here is denied, never prompted.
+        "--permission-mode", "dontAsk",
+        "--allowedTools", "WebSearch", "WebFetch", "mcp__literature__*",
+    ]
+
+
+def run(claude: str, topic: str | None, name: str, model: str, max_turns: int) -> int:
+    out_dir = REPO_ROOT / "literature_review" / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    version = subprocess.run([claude, "--version"], capture_output=True, text=True).stdout.strip()
+    info: dict = {
+        "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "topic": topic, "name": name, "model_requested": model, "max_turns": max_turns,
+        "claude_code_version": version,
+    }
+    proc = subprocess.Popen(build_command(claude, topic, name, model, max_turns), cwd=REPO_ROOT,
+                            stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    result = None
+    for line in proc.stdout:
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if msg.get("type") == "system" and msg.get("subtype") == "init":
+            info["model_used"] = msg.get("model")
+            info["mcp_servers"] = msg.get("mcp_servers")
+            servers = {s.get("name"): s.get("status") for s in msg.get("mcp_servers") or []}
+            if servers.get("literature") != "connected":
+                print(f"WARNING: literature tool server not connected: {servers}", flush=True)
+        elif msg.get("type") == "assistant":
+            for block in msg.get("message", {}).get("content", []):
+                if block.get("type") == "text" and block.get("text", "").strip():
+                    print(f"\n{block['text'].strip()}\n", flush=True)
+                elif block.get("type") == "tool_use":
+                    tool = block.get("name", "").removeprefix("mcp__literature__")
+                    print(f"  -> {tool}({_short(block.get('input') or {})})", flush=True)
+        elif msg.get("type") == "result":
+            result = msg
+    proc.wait()
+
+    if result is None:
+        print(f"Claude Code exited (code {proc.returncode}) without a result. "
+              "Is it installed and signed in? Try: claude auth status", file=sys.stderr)
+        return 1
+    failed = bool(result.get("is_error")) or "error" in (result.get("terminal_reason") or "")
+    info.update({
+        "outcome": result.get("subtype"), "terminal_reason": result.get("terminal_reason"),
+        "is_error": failed, "turns": result.get("num_turns"),
+        "duration_s": round((result.get("duration_ms") or 0) / 1000), "session_id": result.get("session_id"),
+        # Client-side estimate only; usage is covered by the Claude Code seat, not billed per token.
+        "cost_estimate_usd": result.get("total_cost_usd"),
+        "final_message": result.get("result"),
+    })
+    (out_dir / "run_info.json").write_text(json.dumps(info, indent=2, ensure_ascii=False), "utf-8")
+    status = f"FAILED: {result.get('terminal_reason') or result.get('subtype')}" if failed else result.get("subtype")
+    print(f"\n[{status}] turns={info['turns']} time={info['duration_s']}s -> {out_dir}")
+    return 1 if failed else 0
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("topic", nargs="?", default=DEFAULT_TOPIC)
-    p.add_argument("--out", type=Path, default=Path("literature_review"))
-    p.add_argument("--model", default="claude-sonnet-5-5")
+    p.add_argument("topic", nargs="?", help="omit to use the agent's default topic")
+    p.add_argument("--name", default="main", help="output folder under literature_review/ (default: main)")
+    p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--max-turns", type=int, default=120)
-    p.add_argument("--budget", type=float, default=10.0, help="stop once API spend reaches this many USD")
+    p.add_argument("--claude", help="path to the claude executable (default: found on PATH)")
     args = p.parse_args()
     sys.stdout.reconfigure(errors="replace")  # Windows consoles can't print every symbol in paper text
-    load_dotenv(REPO_ROOT / ".env")  # ANTHROPIC_API_KEY lives in .env (git-ignored), never in code
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_CODE_USE_BEDROCK")):
-        sys.exit(f"No model access: put ANTHROPIC_API_KEY=... in {REPO_ROOT / '.env'} "
-                 "(or set CLAUDE_CODE_USE_BEDROCK=1 with AWS credentials).")
-    try:
-        code = asyncio.run(run(args.topic, args.out, args.model, args.max_turns, args.budget))
-    except ClaudeSDKError as e:  # raised after a failed result, which run() has already reported
-        print(f"error: {e}", file=sys.stderr)
-        code = 1
-    sys.exit(code)
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,60}", args.name):
+        sys.exit("--name must be lowercase letters, digits, '-' or '_'")
+    claude = args.claude or shutil.which("claude")
+    if not claude:
+        sys.exit("Claude Code ('claude') was not found on PATH. Install it and sign in with your "
+                 "Caltech account (claude auth login), or pass --claude <path>.")
+    sys.exit(run(claude, args.topic, args.name, args.model, args.max_turns))

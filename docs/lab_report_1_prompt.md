@@ -1,13 +1,15 @@
 # Prompt: complete Lab Report 1 (AM/ME/CE 295)
 
-Paste everything below the line into a new Claude Code session. If you run it inside the AWS
-workspace, first clone the repo there and open the session in the repo folder.
+Paste everything below the line into a new Claude Code session signed in with your Caltech
+account. If you run it inside the AWS workspace, first clone the repo there and open the session
+in the repo folder.
 
 ---
 
 Help me finish **Lab Report 1 for AM/ME/CE 295 (AI Agents for Scientific Discovery), due today,
 Sunday Oct 18, 2026**. We have limited time, so prioritize a complete, honest report over solving
-problems. Ask me before anything that costs money, pushes to GitHub, or changes AWS resources.
+problems. Ask me before anything that costs money or uses significant Claude usage, pushes to
+GitHub, or changes AWS resources.
 
 **Work in steps with checkpoints.** At each **CHECKPOINT** below, stop, show me what it asks
 for, and wait for my reply before continuing. Don't move to the next step on your own, even if
@@ -38,14 +40,22 @@ defects. Repo: `lattice-gnn`, branch `agents/literature-review`.
   Lumpe & Stankovic, PNAS 2021 (doi 10.1073/pnas.2003504118). 41 records have no properties
   (excluded by the authors). Solving E/Es = C*rho^n from each record gives median relative
   density 1.00% (98% within 0.90-1.12%), so the labels appear to be at 1% relative density.
-- `agents/literature/`: literature-review agent built on the Claude Agent SDK (pinned
-  `claude-agent-sdk==0.2.168`, model `claude-sonnet-5-5`). Tools: arXiv search, OpenAlex search,
-  citation snowballing, page-by-page open-access PDF reading, and record/write tools. It has no
-  shell or file-edit access; it only writes `papers.json` and `lit_review.md` into its output folder.
-  Claims are cited to PDF pages. Spending cap $10 per run (`--budget`).
-  Run: `python -m agents.literature` (needs ANTHROPIC_API_KEY, or Bedrock; see below).
-  Its search and PDF tools have been tested against the live APIs; a full agent run has NOT been
-  done yet (no model access configured).
+- Literature-review agent, running in **Claude Code** with the course's Caltech Claude Enterprise
+  seat (the course issues no API keys; graded work must be reproducible with Claude Code):
+  - Agent definition: `.claude/agents/literature-reviewer.md` (instructions, model pinned to
+    `claude-sonnet-5-5`, tools limited to WebSearch, WebFetch and the literature tools; no shell,
+    no file editing).
+  - Tools: a local MCP server `agents/literature/server.py`, registered in `.mcp.json` as
+    `literature`: arXiv search, OpenAlex search, citation snowballing, page-by-page open-access
+    PDF reading, `record_paper`, `write_review`. It writes only `literature_review/<name>/`
+    (`papers.json`, `lit_review.md`). Claims are cited to PDF pages.
+  - Run interactively: `/literature-review [topic]` inside Claude Code. Run non-interactively and
+    reproducibly: `python -m agents.literature [topic] --name <folder>`, which calls `claude -p`
+    and writes `run_info.json` (model ID, Claude Code version, turns, outcome).
+  - History: first built on the Claude Agent SDK with an API key, then ported to Claude Code when
+    the course confirmed seats only (worth a line in the report).
+  - Tested: tool server (all 7 tools against the live APIs), and Claude Code accepting the run
+    command with the tools restricted. A full signed-in agent run has NOT been done yet.
 - Planned agents: architecture/training/tuning agents (write and run PyTorch, so they need a
   sandbox: AWS) and a defects agent that needs finite element analysis (Abaqus if the license allows
   cloud use; otherwise CalculiX or OpenSeesPy).
@@ -63,13 +73,13 @@ paste the output back.
    roughly how much it downloads (PyTorch is several GB), and wait for my OK. Then create a venv; install `requirements.txt` (GPU build of PyTorch if
    there is a GPU, CPU build otherwise) and `agents/requirements.txt`; run a quick import of
    `lattice_gnn` and a short data check on `data/samples/sample_lattices.txt`.
-4. Model access: Is Amazon Bedrock available on this account (`aws sts get-caller-identity`, then
-   whether Claude models are enabled in the region)? Check the current Claude Agent SDK docs for
-   how to point it at Bedrock and note the exact Bedrock model ID we would pin. Otherwise, is an
-   Anthropic API key available? Never print, log or commit a key.
+4. Model access: is Claude Code installed and signed in with my Caltech account
+   (`claude --version`, `claude auth status`: expect `loggedIn: true`)? There is no API key in
+   this course; never create, print or commit one. In Claude Code, does `/mcp` show the
+   `literature` server as connected (needs Python with `agents/requirements.txt` installed)?
 5. Network: can the machine reach export.arxiv.org, api.openalex.org and arxiv.org PDFs? Run the
-   literature tools' free smoke test (no Claude calls), e.g. call `_arxiv_search`, `_oa_search`
-   and `_pdf_pages` from `agents/literature/tools.py`. Note: OpenAlex's free quota is shared per IP,
+   literature tools' free smoke test (no Claude usage), e.g. call `search_arxiv`, `search_openalex`
+   and `pdf_pages` from `agents/literature/tools.py`. Note: OpenAlex's free quota is shared per IP,
    which can be a problem on cloud IPs.
 6. Sandbox: is Docker available and usable without root?
 7. Finite element analysis: is Abaqus installed (`abaqus information=release`), and is a license
@@ -81,17 +91,18 @@ paste the output back.
 bottleneck entries. I will confirm the facts, correct anything wrong (e.g. what the course gave
 us), and approve the workarounds before they go in the report.
 
-## Step 2: Run the literature agent (ask me first, it costs money)
-Run it wherever model access works: AWS if Step 1 passed, otherwise my laptop. It does not execute
-code, so it does not need the sandbox. Before the full run, show me the command and expected cost.
-If no model access is available today, say so and record it as the main bottleneck; then help me
-write the related-work note from papers you can verify with the literature tools directly (still
-with page-cited claims), and say in the report that the agent run is pending.
+## Step 2: Run the literature agent (ask me first; it uses my Claude seat's usage allowance)
+Run it wherever Claude Code is signed in: AWS if Step 1 passed, otherwise my laptop. It does not
+execute code, so it does not need the sandbox. Use the reproducible form,
+`python -m agents.literature --name main` (default topic), from the repo root with the venv's
+Python; it takes roughly 15-30 minutes. If Claude Code can't be signed in today, say so and record
+it as the main bottleneck; then help me write the related-work note from papers you can verify
+with the literature tools directly (still with page-cited claims), and say the agent run is pending.
 
-**CHECKPOINT 2 (before the run):** show me where it will run, the exact command, the model,
-and the budget cap. Wait for my OK.
+**CHECKPOINT 2 (before the run):** show me where it will run, the exact command, the model and
+the turn limit. Wait for my OK.
 
-**CHECKPOINT 3 (after the run):** show me the outcome (turns, cost, errors), how many papers
+**CHECKPOINT 3 (after the run):** show me the outcome from `run_info.json` (turns, errors), how many papers
 were recorded, and your proposed 2-3 papers for the related-work note, with one line each on why.
 Spot-check 2 of the page citations against the PDFs and tell me whether they hold up. I will
 pick the papers before you write.

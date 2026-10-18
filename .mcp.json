@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "literature": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/agents/literature/launch_server.py"]
+    }
+  }
+}

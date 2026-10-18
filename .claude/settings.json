@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": ["literature"],
+  "permissions": {
+    "allow": ["mcp__literature__*", "WebSearch"]
+  }
+}

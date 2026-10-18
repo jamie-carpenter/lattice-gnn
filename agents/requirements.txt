@@ -1,4 +1,4 @@
-# Agents only (the model itself uses ../requirements.txt).
-claude-agent-sdk==0.2.168
+# Literature agent tool server (the agent itself runs in Claude Code; no API key or SDK needed).
+# The model code uses ../requirements.txt.
+mcp==2.3.0
 pypdf==6.21.1
-python-dotenv==1.2.4
