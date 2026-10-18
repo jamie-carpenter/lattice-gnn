@@ -50,9 +50,13 @@ add manufacturing defects.
     normalized so the longest is 1, angles are in degrees, and strut lengths are in cell units.
     Strut thickness is not an input.
   - Moduli are dimensionless, normalized by the base material's Young's modulus Es. Solving
-    E/Es = C * rho_rel^n for each sample record gives rho_rel = 1.0% every time, including a
-    bending-dominated lattice (n = 2), so the listed moduli appear to be at 1% relative density.
-    Confirm this, and the strut model used (beam theory, cross-section), in the dataset paper.
+    E/Es = C * rho_rel^n across the full catalog (17,221 lattices) gives a median rho_rel of
+    1.00% (98% between 0.90% and 1.12%), for both stretching- (n ~ 1) and bending-dominated
+    (n ~ 2) lattices, so the listed moduli appear to be at 1% relative density; the scatter fits
+    C and n being power-law fits printed to 2 decimals. Confirm this, how C and n were fitted,
+    and the strut model used (beam theory, cross-section), in the dataset paper.
+- The catalog has 17,262 lattices. 41 are marked "very small members ... excluded from the main
+  manuscript" and have no properties. Find out how the authors handled them.
 - Model: message-passing GNN on the periodic graph (nodes = strut junctions, edges = struts with
   length/direction features, periodic edges included), updating nodes and struts, mean+max pooling,
   MLP head. Graph-level inputs: Z_avg and log10(total strut length / cell volume).
