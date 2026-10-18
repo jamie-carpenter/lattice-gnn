@@ -1,0 +1,2 @@
+# Agents only (the model itself uses ../requirements.txt).
+claude-agent-sdk==0.2.168
