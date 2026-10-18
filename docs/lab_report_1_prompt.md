@@ -9,6 +9,13 @@ Help me finish **Lab Report 1 for AM/ME/CE 295 (AI Agents for Scientific Discove
 Sunday Oct 18, 2026**. We have limited time, so prioritize a complete, honest report over solving
 problems. Ask me before anything that costs money, pushes to GitHub, or changes AWS resources.
 
+**Work in steps with checkpoints.** At each **CHECKPOINT** below, stop, show me what it asks
+for, and wait for my reply before continuing. Don't move to the next step on your own, even if
+everything passed. If I ask for changes, make them and show me again.
+
+**CHECKPOINT 0 (before starting):** tell me in a few lines where this session is running (AWS
+or my laptop) and your plan for the session, and ask any questions you have.
+
 ## What Lab Report 1 requires (from the course Lab Guideline)
 Goal: show I understand the problem space and that my tooling is getting ready. No working demo needed.
 1. **Related-work note:** 2-3 papers/approaches relevant to my project, with a short synthesis.
@@ -52,7 +59,8 @@ paste the output back.
 1. Environment: what kind of AWS machine this is (EC2 instance or Amazon WorkSpaces desktop),
    OS, CPU cores, RAM, free disk, GPU (`nvidia-smi`). Do files persist after stop/restart?
 2. GitHub: can the repo be cloned and pushed from here (credentials)?
-3. Python: is 3.12 available; create a venv; install `requirements.txt` (GPU build of PyTorch if
+3. Python: is 3.12 available? Before installing anything, tell me what you will install and
+   roughly how much it downloads (PyTorch is several GB), and wait for my OK. Then create a venv; install `requirements.txt` (GPU build of PyTorch if
    there is a GPU, CPU build otherwise) and `agents/requirements.txt`; run a quick import of
    `lattice_gnn` and a short data check on `data/samples/sample_lattices.txt`.
 4. Model access: Is Amazon Bedrock available on this account (`aws sts get-caller-identity`, then
@@ -69,6 +77,10 @@ paste the output back.
    confirm with Caltech IT whether the Abaqus license allows AWS use.
 8. Storage and cost: S3 access; can I see costs / set a budget alert?
 
+**CHECKPOINT 1 (after the AWS checks):** show me the PASS / FAIL / NOT TESTED table and the
+bottleneck entries. I will confirm the facts, correct anything wrong (e.g. what the course gave
+us), and approve the workarounds before they go in the report.
+
 ## Step 2: Run the literature agent (ask me first, it costs money)
 Run it wherever model access works: AWS if Step 1 passed, otherwise my laptop. It does not execute
 code, so it does not need the sandbox. Before the full run, show me the command and expected cost.
@@ -76,7 +88,19 @@ If no model access is available today, say so and record it as the main bottlene
 write the related-work note from papers you can verify with the literature tools directly (still
 with page-cited claims), and say in the report that the agent run is pending.
 
+**CHECKPOINT 2 (before the run):** show me where it will run, the exact command, the model,
+and the budget cap. Wait for my OK.
+
+**CHECKPOINT 3 (after the run):** show me the outcome (turns, cost, errors), how many papers
+were recorded, and your proposed 2-3 papers for the related-work note, with one line each on why.
+Spot-check 2 of the page citations against the PDFs and tell me whether they hold up. I will
+pick the papers before you write.
+
 ## Step 3: Write the report
+**CHECKPOINT 4 (before writing):** show me a one-paragraph problem statement and goal for the
+draft proposal and the report outline. I will correct the project framing before you write it
+all out.
+
 Create `reports/lab_report_1.md` with:
 1. **Project summary and draft proposal**: problem statement, intended users, why an agent is
    appropriate (and what a non-agent baseline would be), planned agents/tools/architecture, how
@@ -91,7 +115,12 @@ Create `reports/lab_report_1.md` with:
    choice), resolve AWS bottlenecks, full literature run, team/TA confirmation.
 5. **AI use note**: which AI tools helped and what I verified myself.
 Also start a running log `LOG.md` (dated entries: done / remaining / bottlenecks), since later
-reports draw on it. Keep the report concise (about 2 pages). Then show me the report to review.
+reports draw on it. Keep the report concise (about 2 pages).
+
+**CHECKPOINT 5 (draft review):** show me the full draft, and list every number and citation in
+it with its source, so I can verify them. Revise until I approve.
 
 ## Step 4: Save
-Commit the report, log and any results (never keys or `.env`), then ask me before pushing to GitHub.
+**CHECKPOINT 6 (before saving):** show me the list of files you will commit (never keys,
+`.env` or credentials) and the commit message. After I approve, commit; then ask me separately
+before pushing to GitHub.
