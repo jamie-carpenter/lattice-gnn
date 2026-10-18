@@ -1,0 +1,546 @@
+[
+  {
+    "title": "Exploring the property space of periodic cellular structures based on crystal networks",
+    "authors": "Thomas S. Lumpe, Tino Stankovic",
+    "year": 2021,
+    "identifier": "10.1073/pnas.2003504118",
+    "category": "dataset",
+    "relevance": 5,
+    "summary": "Catalog of periodic truss lattices decoded from the RCSR and EPINET crystal-net databases, with effective elastic properties from periodic Euler-Bernoulli beam FE homogenization at 1% relative density. Source of our dataset family (confirmed indirectly by Indurkar 2022 and Grega 2024, which both cite this catalog; the catalog count printed in the methods, 17,087, differs from our 17,262 and from Indurkar 17,201).",
+    "relevance_to_project": "Defines labels: E_s = 1 MPa, nu_s = 0.3, rho_rel = 0.01, circular struts, Euler-Bernoulli beams. Scaling n and C: the main text refers to the SI for the fit, so fitting procedure is unverified here. Exclusion of very small members documented only as one sentence in Methods.",
+    "fulltext_source": "Europe PMC full-text XML (PMC7896306); PNAS PDF could not be loaded by read_pdf, so no PDF page numbers are available. Only first ~100k characters read; SI not read.",
+    "venue": "PNAS 118(7), e2003504118",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7896306/",
+    "evidence": [
+      {
+        "claim": "Properties computed by numerical homogenization with Euler-Bernoulli FE beam model and periodic boundary conditions",
+        "location": "Methods (Europe PMC text; PDF page not available)",
+        "quote": "an Euler-Bernoulli finite-element beam model (paraphrase of extracted text)"
+      },
+      {
+        "claim": "All structures scaled to relative density 0.01 at constant bar radius; Es = 1 MPa, nu_s = 0.3",
+        "location": "Section 2 / Methods (Europe PMC text)",
+        "quote": "relative density of 0.01 (paraphrase of extracted text)"
+      },
+      {
+        "claim": "Entries excluded for double entries and very small members causing numerical issues; count 2,730 + 14,532 - 135 - 40 = 17,087",
+        "location": "Methods (Europe PMC text)",
+        "quote": "excluding double entries and structures with very small members that cause numerical issues"
+      },
+      {
+        "claim": "Data deposited in ETH Research Collection",
+        "location": "Data Availability (Europe PMC text)",
+        "quote": "doi.org/10.3929/ethz-b-000457598 and doi.org/10.3929/ethz-b-000457595"
+      },
+      {
+        "claim": "Catalog structures are not optimized; limitations in rigidity condition",
+        "location": "Sections 2 and 4 (Europe PMC text)",
+        "quote": "simply derived from crystal networks without any further optimization (paraphrase)"
+      }
+    ]
+  },
+  {
+    "title": "Predicting deformation mechanisms in architected metamaterials using GNN",
+    "authors": "Padmeya Prashant Indurkar, Sri Karlapati, Angkur Jyoti Dipanka Shaikeea, Vikram S. Deshpande",
+    "year": 2022,
+    "identifier": "arXiv:2202.09427",
+    "category": "gnn_architecture",
+    "relevance": 5,
+    "summary": "Message-passing GNN (convolution + GRU, pooling, MLP) on the periodic lattice graph of the Lumpe-Stankovic catalog, classifying stretching vs bending (scaling exponent n_x) rather than regressing moduli. Independently confirms catalog properties: rho_rel = 0.01, Es = 1 MPa, nu_s = 0.3, E_i = Es C_i rho^n_i.",
+    "relevance_to_project": "Closest published precursor to our GNN: same dataset, periodic edges to neighbouring cells, edge features length, radius, direction cosines. Validation accuracy 81.8% vs 95.2% train (random 90:10 split), a baseline for the n classification only, not for stiffness.",
+    "fulltext_source": "https://arxiv.org/pdf/2202.09427v2",
+    "url": "https://arxiv.org/abs/2202.09427v2",
+    "evidence": [
+      {
+        "claim": "Dataset: 17,201 lattices from the open catalog; rho_rel = 0.01, Es = 1 MPa, nu_s = 0.3",
+        "location": "Section II",
+        "page": 1,
+        "quote": "comprises of 17,201 unique 3D lattice topologies adopted from an open-source catalogue"
+      },
+      {
+        "claim": "Scaling law and exponent interpretation",
+        "location": "Section II, Eq. 1",
+        "page": 2,
+        "quote": "Ei = ES Ci rho^ni ... stretching dominated behaviour for ni ~ 1, bending dominated for ni ~ 2 (extracted text garbled; paraphrased)"
+      },
+      {
+        "claim": "Periodic edges connect boundary nodes to neighbouring cells; edge features length, radius, direction cosines",
+        "location": "Section III",
+        "page": 3,
+        "quote": "We connect the nodes on the outer peripheral faces of the lattice unit cell to the nodes in the neighbouring unit cells"
+      },
+      {
+        "claim": "Random 90:10 split; validation accuracy 81.8%, train 95.2%",
+        "location": "Section V",
+        "page": 4,
+        "quote": "accuracy achieved on the validation dataset is 81.8%"
+      }
+    ]
+  },
+  {
+    "title": "Energy-conserving equivariant GNN for elasticity of lattice architected metamaterials",
+    "authors": "Ivan Grega, Ilyes Batatia, Gabor Csanyi, Sri Karlapati, Vikram S. Deshpande",
+    "year": 2024,
+    "identifier": "arXiv:2401.16914",
+    "category": "symmetry_equivariance",
+    "relevance": 5,
+    "summary": "MACE-based SE(3)-equivariant GNN predicting the full 21-component stiffness tensor (via 6x6 Mandel matrix) with a positive semi-definite output layer; trained on a dataset derived from Lumpe-Stankovic with nodal perturbations and FE at 3 relative densities. Compared with CGC and NNConv baselines.",
+    "relevance_to_project": "Most important baseline on a derived version of our dataset. Shows equivariance helps, PSD layer costs some accuracy, and learned penalties do not fix negative eigenvalues. Error metrics are in their own L_comp units (defined in appendix, not read), so they cannot be compared with log10 modulus errors.",
+    "fulltext_source": "https://arxiv.org/pdf/2401.16914v2",
+    "venue": "ICLR 2024",
+    "url": "https://arxiv.org/abs/2401.16914v2",
+    "evidence": [
+      {
+        "claim": "Built on Lumpe & Stankovic crystal-network dataset; reduced to 8954 base lattices after fixing problematic ones",
+        "location": "Section 4.1",
+        "page": 5,
+        "quote": "reduces the dataset size to 8954 base lattices"
+      },
+      {
+        "claim": "Nodal perturbation augmentation, 635,454 geometries, FE at 3 relative densities; train 7000 base lattices, val/test 1296; test uses 0.1 perturbation (OOD)",
+        "location": "Section 4.1",
+        "page": 5,
+        "quote": "Thus, testing is done on OOD data."
+      },
+      {
+        "claim": "Table 1: MACE L_comp 3.88 vs CGC 8.37 (CGC+tr 4.47); MACE predicts negative eigenvalues for 30% of lattices without PSD layer, 0% with it (L_comp 3.61)",
+        "location": "Table 1, Table 2",
+        "page": 7,
+        "quote": "The base MACE model trained on the data predicts negative eigenvalues for 30% of lattices"
+      },
+      {
+        "claim": "Matrix-square A^2 PSD function gave best results; PSD enforcement slightly raises error versus unconstrained",
+        "location": "Section 5.3, Table 3",
+        "page": 8,
+        "quote": "the matrix square method, A2, achieves most favourable results"
+      },
+      {
+        "claim": "Dataset eigenvalues all positive; zero eigenvalue would be a mechanism",
+        "location": "Footnote 2",
+        "page": 8,
+        "quote": "it is a feature of our dataset that all eigenvalues are positive"
+      },
+      {
+        "claim": "GNN inference 3 orders of magnitude faster than FE (5000 lattices: 5-15 s vs 1.1e4 s)",
+        "location": "Table 4",
+        "page": 9,
+        "quote": "all these models are 3 orders of magnitude faster than FE calculation"
+      },
+      {
+        "claim": "Dual-graph representation gave no gain on this data; Lmax = 4 needed for 4th-order tensor",
+        "location": "Footnote 1, Section 5.3",
+        "page": 6,
+        "quote": "We do not observe any performance gain from using dual graph representation on our data"
+      }
+    ]
+  },
+  {
+    "title": "Neural Network Layers for Prediction of Positive Definite Elastic Stiffness Tensors",
+    "authors": "Charles F. Jekel, Kenneth E. Swartz, Daniel A. White, Daniel A. Tortorelli, Seth E. Watts",
+    "year": 2022,
+    "identifier": "arXiv:2203.13938",
+    "category": "symmetry_equivariance",
+    "relevance": 4,
+    "summary": "Compares Cholesky and eigendecomposition transformation layers that force predicted homogenized 6x6 stiffness matrices to be symmetric positive definite; tests on Isotruss lattice datasets. Shows that plain regression does not guarantee SPD output.",
+    "relevance_to_project": "Our targets are 9 orthotropic engineering constants; positive definiteness of the assembled orthotropic C requires E, G > 0 (guaranteed by predicting log10) plus a Poisson-coupling stability condition, which Jekel-style layers address for the full matrix.",
+    "fulltext_source": "https://arxiv.org/pdf/2203.13938v1",
+    "url": "https://arxiv.org/abs/2203.13938v1",
+    "evidence": [
+      {
+        "claim": "Fitting to SPD data does not guarantee SPD predictions; layers enforce SPD; one layer improves average accuracy",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "Fitting a model to SPD data does not guarantee the model’s predictions will remain SPD."
+      },
+      {
+        "claim": "Orthotropic C has 9 independent components in Voigt form",
+        "location": "Section 2, Eq. 2",
+        "page": 4,
+        "quote": "an orthotropic material is simplified to ... with just 9 independent components"
+      },
+      {
+        "claim": "Datasets are small, parametric Isotruss (100 and 1000 Latin-hypercube samples), single topology",
+        "location": "Section 2",
+        "page": 4,
+        "quote": "One hundred random Latin hypercube samples were performed"
+      }
+    ]
+  },
+  {
+    "title": "Inverting the structure–property map of truss metamaterials by deep learning",
+    "authors": "Jan-Hendrik Bastek, Siddhant Kumar, Bastian Telgen, Raphael N. Glaesener, Dennis M. Kochmann",
+    "year": 2021,
+    "identifier": "10.1073/pnas.2111505119",
+    "category": "inverse_design",
+    "relevance": 4,
+    "summary": "Forward network predicts orthotropic stiffness (9 constants) from one-hot topology, relative density and stretch eigenvalues, then applies tensor rotations inside the graph; inverse model by a tandem design. Trained on 3,000,000 samples.",
+    "relevance_to_project": "Precedent for predicting the 9 orthotropic constants and for building the 6x6 matrix by differentiable Voigt-notation rotations. Not graph-based and not on our dataset; R2 is not comparable with log-modulus error.",
+    "fulltext_source": "Europe PMC full-text XML (PMC8740766), first ~100k characters; no PDF page numbers (read_pdf failed on PNAS PDF)",
+    "venue": "PNAS 119(1)",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8740766/",
+    "evidence": [
+      {
+        "claim": "Training set of 3,000,000 pairs; test 30,000; relative density 0.002 to 0.1",
+        "location": "Section 2 (Europe PMC text)",
+        "quote": "consisting of n=3,000,000 pairs"
+      },
+      {
+        "claim": "Forward model R2 >= 0.98 over all elastic constants; stiffness normalized by base Young modulus; nu = 0.3",
+        "location": "Section 2, Fig. 2 caption (Europe PMC text)",
+        "quote": "coefficient of determination R2 >= 0.98 across all elastic constants"
+      },
+      {
+        "claim": "Orthotropic part predicts 9 nonzero constants; positive definiteness not enforced in network, honored via data",
+        "location": "Section 2 (Europe PMC text)",
+        "quote": "F1 outputs the 9 nonzero constants of the orthotropic tensor (paraphrase)"
+      }
+    ]
+  },
+  {
+    "title": "Unifying the design space and optimizing linear and nonlinear truss metamaterials by generative modeling",
+    "authors": "Li Zheng, Konstantinos Karapiperis, Siddhant Kumar, Dennis M. Kochmann",
+    "year": 2023,
+    "identifier": "10.1038/s41467-023-42068-x",
+    "category": "inverse_design",
+    "relevance": 4,
+    "summary": "VAE plus property predictor on a graph representation of 965,736 cubic-symmetry trusses (27 candidate nodes), Timoshenko-beam FE homogenization with periodic BCs at constant relative density 0.15; predicts 9 orthotropic stiffness components normalized by Es.",
+    "relevance_to_project": "Shows a second label-generation convention (Timoshenko beams, rho = 0.15 vs 0.01 in our data) and R2 >= 98.2% for stiffness. Dataset is its own, not Lumpe-Stankovic, so numbers are not baselines for us.",
+    "fulltext_source": "Europe PMC full-text XML (PMC10663604), first ~100k characters; no PDF page numbers (read_pdf output unusable)",
+    "venue": "Nature Communications",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10663604/",
+    "evidence": [
+      {
+        "claim": "965,736 structures in the linear dataset; own generation procedure",
+        "location": "Creating the design space (Europe PMC text)",
+        "quote": "965,736 unique structures"
+      },
+      {
+        "claim": "Struts as linear elastic Timoshenko beams, circular cross-section, periodic FE homogenization",
+        "location": "Creating the design space; Fig. 1 caption (Europe PMC text)",
+        "quote": "linear elastic Timoshenko beams with a circular cross-section"
+      },
+      {
+        "claim": "Constant relative density 0.15; nine orthotropic components normalized by base modulus",
+        "location": "Creating the design space (Europe PMC text)",
+        "quote": "constant relative density rho = 0.15 is maintained across all structures"
+      },
+      {
+        "claim": "Stiffness predictor R2 >= 98.2% across all components",
+        "location": "Performance of the VAE model (Europe PMC text)",
+        "quote": "overall achieves an R2 >= 98.2% accuracy across all stiffness components"
+      }
+    ]
+  },
+  {
+    "title": "Graph-based metamaterials: Deep learning of structure-property relations",
+    "authors": "Paul P. Meyer, Colin Bonatti, Thomas Tancogne-Dejean, Dirk Mohr",
+    "year": 2022,
+    "identifier": "10.1016/j.matdes.2022.111175",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "Graph representation and deep-learning models (crystal-graph-convolution type) of stiffness and conductivity tensors for shell-lattices from FE data. Described by Grega 2024 (p. 4) as the only prior GNN stiffness-tensor model for architected materials: non-equivariant, 7-fold rotation/mirror augmentation, smooth-L1 loss on 21 components.",
+    "relevance_to_project": "Source of the CGC baseline and the augmentation recipe that Grega 2024 compares against. Shell-lattices, not struts.",
+    "fulltext_source": "abstract only (plus the description in Grega 2024 p. 4)",
+    "venue": "Materials & Design",
+    "evidence": [
+      {
+        "claim": "Graph models provide an effective representation of shell-lattices for stiffness and heat conductivity tensors",
+        "location": "abstract",
+        "quote": "graph models provide an effective representation of shell-lattices"
+      },
+      {
+        "claim": "Non-equivariant; 7-fold augmentation; component-wise smooth L1 on 21 components",
+        "location": "Grega 2024 Section 3 (secondary description)",
+        "page": 4,
+        "quote": "This increased the size of the training dataset 7-fold."
+      }
+    ]
+  },
+  {
+    "title": "Graph neural networks for strut-based architected solids",
+    "authors": "Ivan Grega, Ilyes Batatia, Padmeya P. Indurkar, Gabor Csanyi et al.",
+    "year": 2024,
+    "identifier": "10.1016/j.jmps.2024.105966",
+    "category": "gnn_architecture",
+    "relevance": 4,
+    "summary": "Examines structure-property relations of a large strut-based lattice dataset, enriches it with nodal perturbations (four classes of mechanical behaviour observed), and proposes a GNN method.",
+    "relevance_to_project": "Likely the journal companion to the ICLR paper on a Lumpe-Stankovic-derived dataset with node perturbation; relevant to the later node-misplacement defect study. Full text could not be obtained, so no results are cited.",
+    "fulltext_source": "abstract only",
+    "venue": "Journal of the Mechanics and Physics of Solids",
+    "evidence": [
+      {
+        "claim": "Dataset enriched by perturbing nodal positions; four classes of mechanical behaviour observed; GNN proposed",
+        "location": "abstract",
+        "quote": "We enrich the dataset by perturbing nodal positions and observe four classes of mechanical behaviour"
+      }
+    ]
+  },
+  {
+    "title": "Multi-objective design of multi-material truss lattices utilizing graph neural networks",
+    "authors": "Ramon Frey, Michael R. Tucker, Mohamadreza Afrasiabi, Markus Bambach",
+    "year": 2025,
+    "identifier": "10.1038/s41598-025-86812-3",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "GNN for truss lattices with material properties as edge features, used for multi-objective inverse design of multi-material lattices.",
+    "relevance_to_project": "Example of edge-feature design for struts; results not read.",
+    "fulltext_source": "abstract only (read_pdf failed)",
+    "venue": "Scientific Reports",
+    "evidence": [
+      {
+        "claim": "Material properties incorporated as edge features of the graph",
+        "location": "abstract",
+        "quote": "incorporates material properties as edge features within the graph representation of multi-material truss lattices"
+      }
+    ]
+  },
+  {
+    "title": "Elastic and failure response of imperfect three-dimensional metallic lattices: the role of geometric defects induced by Selective Laser Melting",
+    "authors": "Lu Liu, Paul H. Kamm, Francisco Garcia-Moreno, John Banhart, Damiano Pasini",
+    "year": 2017,
+    "identifier": "10.1016/j.jmps.2017.07.003",
+    "category": "defects_manufacturing",
+    "relevance": 4,
+    "summary": "X-ray CT of SLM lattices (octet and rhombicuboctahedron units): statistical distributions of strut waviness, thickness variation and oversizing were extracted and used to build FE models of statistically representative imperfect lattices.",
+    "relevance_to_project": "Template for our defect list (diameter variation, waviness). Knockdown numbers were not obtained (full text not read), so no quantitative claim is made.",
+    "fulltext_source": "abstract only (via secondary search summary; read_pdf failed)",
+    "venue": "JMPS 107, 160-184",
+    "evidence": [
+      {
+        "claim": "Defect statistics (waviness, thickness variation, oversizing) extracted by CT and used in numerical models",
+        "location": "abstract (secondary summary from WebSearch)",
+        "quote": "strut waviness, strut thickness variation, and strut oversizing (paraphrase)"
+      }
+    ]
+  },
+  {
+    "title": "Effect of strut cross section and strut defect on tensile properties of cubic cellular structure",
+    "authors": "Sunil Raghavendra, A. Molinari, V. Fontanari, Michele Dallago et al.",
+    "year": 2019,
+    "identifier": "10.1002/mdp2.118",
+    "category": "defects_manufacturing",
+    "relevance": 3,
+    "summary": "FE study of cubic lattices with strut oversizing, varying thickness and waviness introduced via varying cross-sections along a strut.",
+    "relevance_to_project": "Method for imposing diameter variation and waviness on a beam model.",
+    "fulltext_source": "abstract only",
+    "venue": "Material Design & Processing Communications",
+    "evidence": [
+      {
+        "claim": "Defects introduced in FE by varying cross-sections along a strut",
+        "location": "abstract",
+        "quote": "defects like strut oversizing, varying thickness, and strut waviness"
+      }
+    ]
+  },
+  {
+    "title": "An Atlas of Extreme Properties in Cubic Symmetric Metamaterials",
+    "authors": "Sahar Choukir, Nirosh Manohara, Chandra Veer Singh",
+    "year": 2026,
+    "identifier": "arXiv:2603.10934",
+    "category": "dataset",
+    "relevance": 2,
+    "summary": "About 1.95 million voxel-based periodic unit cells from all 36 cubic space groups with a 3D CNN surrogate predicting strain-energy density under uniaxial, shear and hydrostatic loading.",
+    "relevance_to_project": "Another large dataset, but voxel-based and cubic-only, so not a drop-in for our strut graphs.",
+    "fulltext_source": "https://arxiv.org/pdf/2603.10934 (pages 1-2 read)",
+    "url": "https://arxiv.org/abs/2603.10934",
+    "evidence": [
+      {
+        "claim": "~1.95 million unit cells from 36 cubic space groups; CNN predicts strain-energy density",
+        "location": "abstract",
+        "page": 1,
+        "quote": "a database of approximately 1.95 million periodic unit cells"
+      }
+    ]
+  },
+  {
+    "title": "Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties",
+    "authors": "Tian Xie, Jeffrey C. Grossman",
+    "year": 2017,
+    "identifier": "arXiv:1710.10324",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "Graph convolution on the periodic crystal graph with edge (bond) features for property prediction. Origin of the CGC layer used as a baseline for lattice stiffness by Meyer 2022 and Grega 2024.",
+    "relevance_to_project": "Reference design for periodic-graph message passing with edge features.",
+    "fulltext_source": "abstract only",
+    "venue": "Phys. Rev. Lett. 120, 145301",
+    "url": "https://arxiv.org/abs/1710.10324v3",
+    "evidence": [
+      {
+        "claim": "Learns properties directly from atom connectivity in the crystal",
+        "location": "abstract",
+        "quote": "directly learn material properties from the connection of atoms in the crystal"
+      }
+    ]
+  },
+  {
+    "title": "MACE: Higher Order Equivariant Message Passing Neural Networks for Fast and Accurate Force Fields",
+    "authors": "Ilyes Batatia, David P. Kovacs, Gregor N. C. Simm, Christoph Ortner, Gabor Csanyi",
+    "year": 2022,
+    "identifier": "arXiv:2206.07697",
+    "category": "symmetry_equivariance",
+    "relevance": 3,
+    "summary": "Equivariant MPNN using higher body-order messages; backbone of Grega 2024 lattice model.",
+    "relevance_to_project": "Candidate if later agents want an equivariant architecture; our orthotropic-in-lattice-axes targets are invariant to the cell frame, so equivariance is optional.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2206.07697v2",
+    "evidence": [
+      {
+        "claim": "Uses four-body messages in an equivariant MPNN",
+        "location": "abstract",
+        "quote": "using four-body messages reduces the"
+      }
+    ]
+  },
+  {
+    "title": "Prediction and control of fracture paths in disordered architected materials using graph neural networks",
+    "authors": "Konstantinos Karapiperis, Dennis M. Kochmann",
+    "year": 2023,
+    "identifier": "10.1038/s44172-023-00085-0",
+    "category": "defects_manufacturing",
+    "relevance": 3,
+    "summary": "Graph convolution plus GRU predicts fracture paths in irregular lattices with engineered topological and geometric disorder, trained on elastoplastic beam FE.",
+    "relevance_to_project": "Shows GNNs on disordered beam lattices; fracture, not stiffness.",
+    "fulltext_source": "abstract only",
+    "venue": "Communications Engineering",
+    "evidence": [
+      {
+        "claim": "Irregular cellular materials with engineered topological and geometrical disorder; GNN for fracture path",
+        "location": "abstract",
+        "quote": "engineered topological and geometrical disorder"
+      }
+    ]
+  },
+  {
+    "title": "Similarity equivariant graph neural networks for homogenization of metamaterials",
+    "authors": "Fleur Hendriks, Vlado Menkovski, Martin Doskar, M.G.D. Geers et al.",
+    "year": 2025,
+    "identifier": "10.1016/j.cma.2025.117867",
+    "category": "symmetry_equivariance",
+    "relevance": 3,
+    "summary": "Equivariant GNN surrogate for homogenization of soft porous metamaterials, including unseen microstructures.",
+    "relevance_to_project": "Another equivariance-for-homogenization precedent; 2D porous metamaterials, not struts.",
+    "fulltext_source": "abstract only",
+    "venue": "CMAME",
+    "evidence": [
+      {
+        "claim": "GNN surrogate for homogenization including microstructure as network input",
+        "location": "abstract",
+        "quote": "we include the microstructure as part of the network"
+      }
+    ]
+  },
+  {
+    "title": "Status and Challenges in Homogenization Methods for Lattice Materials",
+    "authors": "Jacobs Somnic, Bruce W. Jo",
+    "year": 2022,
+    "identifier": "10.3390/ma15020605",
+    "category": "homogenization",
+    "relevance": 3,
+    "summary": "Review of homogenization methods for lattice materials versus FE-based approaches.",
+    "relevance_to_project": "Background for the label-generation section; details not read.",
+    "fulltext_source": "abstract only",
+    "venue": "Materials 15(2)",
+    "evidence": [
+      {
+        "claim": "Review of homogenization approaches for lattice materials",
+        "location": "abstract",
+        "quote": "Lattice structures have shown great potential in that mechanical properties are customizable"
+      }
+    ]
+  },
+  {
+    "title": "A data-driven framework for structure-property correlation in ordered and disordered cellular metamaterials",
+    "authors": "Shengzhi Luan, Enze Chen, Joel John, Stavros Gaitanaros",
+    "year": 2023,
+    "identifier": "10.1126/sciadv.adi1453",
+    "category": "surrogate_model",
+    "relevance": 3,
+    "summary": "ML models plus interpretability algorithms predict effective stiffness of ordered and disordered cellular microstructures and show strut orientation can dominate stiffness.",
+    "relevance_to_project": "Evidence that strut orientation distribution is a strong feature; relevant for feature engineering and disorder.",
+    "fulltext_source": "abstract only",
+    "venue": "Science Advances",
+    "evidence": [
+      {
+        "claim": "Strut orientation can be critical in determining effective stiffness",
+        "location": "abstract",
+        "quote": "strut orientation can be critical in determining effective stiffness"
+      }
+    ]
+  },
+  {
+    "title": "Inverse design of truss lattice materials with superior buckling resistance",
+    "authors": "Marco Maurizi, Chao Gao, Filippo Berto",
+    "year": 2022,
+    "identifier": "10.1038/s41524-022-00938-w",
+    "category": "inverse_design",
+    "relevance": 2,
+    "summary": "Deep neural network plus genetic algorithm for non-uniform truss lattices targeting buckling resistance.",
+    "relevance_to_project": "Peripheral; non-stiffness property.",
+    "fulltext_source": "abstract only",
+    "venue": "npj Computational Materials",
+    "evidence": [
+      {
+        "claim": "DNN with genetic algorithm for inverse design of non-uniformly assembled lattices",
+        "location": "abstract",
+        "quote": "deep neural network and genetic algorithm"
+      }
+    ]
+  },
+  {
+    "title": "Inverse-designed spinodoid metamaterials",
+    "authors": "Siddhant Kumar, Stephanie Tan, Li Zheng, Dennis M. Kochmann",
+    "year": 2020,
+    "identifier": "10.1038/s41524-020-0341-6",
+    "category": "inverse_design",
+    "relevance": 2,
+    "summary": "Non-periodic spinodoid topologies with a simple parametrization and NN-based forward/inverse design of orthotropic stiffness.",
+    "relevance_to_project": "Orthotropic-stiffness surrogate precedent; not periodic trusses.",
+    "fulltext_source": "abstract only",
+    "venue": "npj Computational Materials",
+    "evidence": [
+      {
+        "claim": "Introduces non-periodic spinodoid class with simple parametrization",
+        "location": "abstract",
+        "quote": "we introduce the non-periodic class of spinodoid topologies"
+      }
+    ]
+  },
+  {
+    "title": "Integrating lattice materials science into the traditional processing-structure-properties paradigm",
+    "authors": "Frank W. Zok",
+    "year": 2019,
+    "identifier": "10.1557/mrc.2019.152",
+    "category": "defects_manufacturing",
+    "relevance": 3,
+    "summary": "Framework treating topology, morphology and defects of lattice materials within processing-structure-properties.",
+    "relevance_to_project": "Taxonomy for defect types to implement.",
+    "fulltext_source": "abstract only",
+    "venue": "MRS Communications",
+    "evidence": [
+      {
+        "claim": "Emphasis on topology, morphology and defects of lattice materials",
+        "location": "abstract",
+        "quote": "topology, morphology, and defects of lattice materials"
+      }
+    ]
+  },
+  {
+    "title": "Multiscale Experiments and Predictive Modelling for Inverse Design and Failure Mitigation in Additively Manufactured Lattices",
+    "authors": "Mattia Utzeri, Marco Sasso, V.S. Deshpande, Shanmugam Kumar",
+    "year": 2024,
+    "identifier": "arXiv:2402.16452",
+    "category": "defects_manufacturing",
+    "relevance": 2,
+    "summary": "FFF-printed lattices with four topologies and three relative densities; micro-CT reveals as-built deviations; predictive modelling.",
+    "relevance_to_project": "Experimental as-built evidence; mostly energy absorption.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2402.16452",
+    "evidence": [
+      {
+        "claim": "Macroscale testing and micro-CT imaging reveal as-built differences",
+        "location": "abstract",
+        "quote": "Macroscale testing and micro-CT imaging reveal"
+      }
+    ]
+  }
+]

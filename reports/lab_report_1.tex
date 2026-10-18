@@ -1,0 +1,177 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\setlist{nosep, leftmargin=*}
+\titlespacing*{\section}{0pt}{1.0ex}{0.5ex}
+\setlength{\parskip}{0.5ex}
+\setlength{\parindent}{0pt}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\rhob}{\bar{\rho}}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Lab Report 1 (Weeks 1--2): Agents for a Lattice-Stiffness GNN}\\[0.5ex]
+  Jamie Carpenter \quad$\cdot$\quad AM/ME/CE 295 \quad$\cdot$\quad 18 October 2026 \quad$\cdot$\quad
+  \url{https://github.com/jamie-carpenter/lattice-gnn}
+\end{center}
+
+\section{Draft project proposal}
+
+\textbf{Problem and goal.} The effective elastic properties of architected strut lattices usually
+come from finite-element (FE) homogenization, which is accurate but too slow for exploring large
+design spaces of unit cells. This project builds a graph neural network (GNN) that predicts these
+properties directly from the unit-cell geometry and generalizes to unit cells it has not seen in
+training. Each unit cell is represented as a periodic graph, with nodes at strut junctions and edges
+along struts, and the model predicts $\log_{10}$ of the moduli $E_x, E_y, E_z, G_{yz}, G_{xz},
+G_{xy}$ (normalized by the base-material modulus $E_s$) and three Poisson coupling terms. It is
+trained on the catalog of Lumpe \& Stankovi\'c~\cite{lumpe}, which contains about 17,000
+lattices. The same framework could later be extended to manufacturing defects, such as
+strut-diameter variation, waviness, missing struts and node misplacement, and possibly to size
+effects, but these are future directions rather than the main focus. The intended users are
+researchers and engineers who need fast, physically valid stiffness estimates for many candidate
+unit cells.
+
+\textbf{Why an agent-based approach.} Building a reliable surrogate is a chain of distinct,
+tool-heavy sub-goals, each of which can be handled by its own agent while I approve every
+consequential action. The non-agent baseline is the same pipeline done by hand, with a fixed
+training script and a manual hyperparameter search.
+
+\textbf{Planned architecture.} Table~\ref{tab:agents} breaks the goal into sub-goals and assigns
+each one to its own agent, listing the data that agent is given (its memory) and the environment
+it works in (its tools). All agents run in Claude Code with pinned model IDs and
+share memory through versioned files in the repository, such as \texttt{LOG.md},
+\texttt{papers.json} and the training-run records.
+
+\begin{table}[h]\centering\small
+\caption{Sub-goals, agents, memory and tools.}\label{tab:agents}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.9cm} >{\raggedright\arraybackslash}p{2.0cm} Y Y@{}}
+\toprule
+Sub-goal & Agent & Data supplied (memory) & Environment (tools) \\
+\midrule
+Understand conventions and prior work & Literature (built) & Project brief; writes \texttt{papers.json} and a review with page-cited evidence that the other agents read & arXiv, OpenAlex, citation links and a page-by-page PDF reader (a tool server), web search \\
+Prepare and validate the data & Data & Catalog file, data-check report, fixed train/test splits (random, and by held-out lattice family) & Parser, periodic graph builder, \texttt{check\_data.py}, \texttt{plot\_lattice.py} \\
+Design and train the GNN & Training & Conventions from the review, data report, experiment log of configurations and metrics & Python with PyTorch Geometric on the AWS WorkSpace, \texttt{train.py} \\
+Tune and stress-test generalization & Evaluation & Experiment log, held-out unseen unit cells, recorded failure cases & AWS WorkSpace, \texttt{predict.py}, positive-definiteness check \\
+Model defects (later) & Defects & Defect literature, defect specifications, database of FE results & FE solver (Abaqus or CalculiX) exposed as a tool server \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Measuring success and risks.} The main measure is the prediction error (RMSE and $R^2$) on
+lattices held out from training. Many lattices in the catalog are close variants of one another,
+so if the test set is drawn at random, most test lattices have a near-twin in the training set and
+the error looks better than it would on a truly new design. I will therefore also hold out whole
+families of related lattices, so that the test lattices have topologies the model has never seen,
+and compare both results with the baselines. I will also assemble the predicted $6\times6$
+stiffness matrix and count how often it is not positive definite, and every reported number must be
+reproducible from a committed command. The main risks are unconfirmed dataset conventions
+(Section~\ref{sec:rw}) and the FE pipeline needed for the defect extension.
+
+\section{Related-work note}\label{sec:rw}
+
+The literature agent recorded 22 papers. The three most relevant to this project are summarized
+below. Page numbers refer to PDF pages of the arXiv versions, and I checked every number cited here
+against the source.
+
+\textbf{Lumpe \& Stankovi\'c, PNAS 2021~\cite{lumpe}: the dataset.} The authors decode crystal nets
+into periodic strut lattices and compute their effective elastic properties with an
+Euler--Bernoulli FE beam model. The base material has $E_s = 1$\,MPa and $\nu_s = 0.3$, and every
+structure uses a constant bar radius of 0.1\,mm, scaled to a relative density of $\rhob = 0.01$.
+After removing duplicates and structures with very small members, the catalog has 17,087 unique
+entries (Methods, read as Europe PMC text without page numbers). This paper defines my training
+labels and confirms my own finding that they correspond to 1\% relative density: solving
+$E/E_s = C\rhob^{\,n}$ for each record gives a median of 1.00\%. My copy of the catalog has 17,262
+records, 41 of them without properties, which I still need to reconcile with the paper's count.
+
+\textbf{Indurkar et al.\ 2022~\cite{indurkar}: a GNN on the same catalog.} This work trains a
+message-passing GNN on 17,201 lattices from the same catalog at $\rhob = 0.01$ [p.~1]. The graph
+includes periodic edges to neighbouring unit cells [p.~3], the same design choice I use. Instead of
+predicting stiffness, the network classifies lattices as stretching-dominated, bending-dominated or
+mixed, with 81.8\% validation accuracy on a random 90:10 split [p.~4]. The moduli span $10^{-8}$ to
+$10^{-3}$ [p.~2], which supports predicting $\log_{10}$ moduli. Their random split can put
+near-identical lattices in both the training and the validation set, which is why I will also test
+on held-out families of lattices.
+
+\textbf{Grega et al., ICLR 2024~\cite{grega}: an equivariant GNN for the stiffness tensor.} This
+work uses the same catalog [p.~4], cleaned to 8,954 base lattices and augmented with nodal
+perturbations to 635,454 geometries, with the perturbations of each lattice kept on one side of the
+train/test split [p.~5]. An equivariant MACE network predicts the full stiffness tensor; without
+constraints it predicted physically impossible negative eigenvalues for 30\% of lattices, which a
+positive-semi-definite output layer removed [p.~7]. This is the closest prior work to mine. It shows
+that physical validity must be checked explicitly, and its nodal perturbations are a useful
+template for the later defect extension.
+
+\textbf{Synthesis.} Together, these papers show that the catalog is a sound basis for learning,
+that periodic graphs are an effective representation, and that GNNs can predict lattice stiffness.
+They also point to two pitfalls: test scores that look too good because near-identical lattices
+appear in both the training and test sets, and predictions that are physically invalid. My project
+builds on these papers, and I will evaluate my model on lattice families it has never seen, so that
+its accuracy reflects how it would perform on genuinely new unit cells.
+
+\section{Progress}\label{sec:progress}
+
+\textbf{Done.} The repository contains the data pipeline (a parser, a periodic graph builder and
+the GNN model in \texttt{lattice\_gnn/}), the full catalog, pinned requirements, and a running log
+in \texttt{LOG.md}; the data check passes on the sample file. The literature agent, first built on
+the Claude Agent SDK and then moved to Claude Code, was run with
+\texttt{python -m agents.literature --name main}. The first run stopped after 32 turns when Claude
+Code's shell-safety check refused a tool call containing a formula, and the agent stopped rather
+than work around it; after I adjusted its instructions, the second run completed in 81 turns with a
+page-cited review of 22 papers. On the course's Amazon WorkSpaces desktop, GitHub access, Python
+3.12 with the pinned packages, Claude Code and network access all work, so code-running agents can
+run there, isolated from my own computer and with my approval of each command. Abaqus is not yet
+installed (full results in \texttt{LOG.md}).
+
+\textbf{Remaining.} I still need to read the dataset's supplementary information, reconcile the
+record counts, run the baselines and a first training run, and read the defect literature in full.
+
+\textbf{Bottleneck.} The one open bottleneck is Abaqus: it is not installed on the WorkSpace, and I
+have not yet confirmed that the Caltech licence allows its use on AWS. It only affects the later
+defect work, so it does not block Lab Report 2. For now I can prototype defect labels with an
+open-source solver (CalculiX or OpenSeesPy), and I will confirm the licence terms with Caltech IT
+by 1 November.
+
+\section{Next steps}
+
+\begin{enumerate}
+  \item Define the research question precisely and write the one-page project proposal.
+  \item Read the dataset's supplementary information, reconcile the record counts, and update the
+        related-work note.
+  \item Implement the baselines and complete a first GNN training run on the CPU, testing on
+        held-out lattice families and checking positive definiteness, and record the results in \texttt{LOG.md}.
+  \item Confirm the Abaqus licence terms for AWS, choose the FE solver for the later defect work,
+        and test it on a single lattice.
+\end{enumerate}
+
+\section{AI use note}
+
+Claude Code (\texttt{claude-opus-5-5}) ran the environment checks, built the literature agent's
+command-line tool interface, checked citations and drafted this report. The literature agent
+(\texttt{claude-sonnet-5-5}, Claude Code 2.1.299) searched for, read and recorded the papers; its
+outputs and run record are in \texttt{literature\_review/main/}. I verified the environment
+results, chose the three papers, and checked every number and page citation in
+Section~\ref{sec:rw} against the PDFs and the Europe PMC text. One citation from the agent turned
+out to be a paraphrase rather than a direct quote, so I did not use it.
+
+\begin{thebibliography}{3}\small
+\bibitem{lumpe} T.~S. Lumpe, T.~Stankovi\'c. Exploring the property space of periodic cellular
+  structures based on crystal networks. \emph{PNAS} 118(7), 2021. doi:10.1073/pnas.2003504118.
+\bibitem{indurkar} P.~P. Indurkar, S.~Karlapati, A.~J.~D. Shaikeea, V.~S. Deshpande. Predicting
+  deformation mechanisms in architected metamaterials using GNN. arXiv:2202.09427v2, 2022.
+\bibitem{grega} I.~Grega, I.~Batatia, G.~Cs\'anyi, S.~Karlapati, et al. Energy-conserving
+  equivariant GNN for elasticity of lattice architected metamaterials. ICLR 2024,
+  arXiv:2401.16914v2.
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,19 @@
+{
+  "started_utc": "2026-10-18T18:37:02+00:00",
+  "topic": null,
+  "name": "main",
+  "model_requested": "claude-sonnet-5-5",
+  "max_turns": 120,
+  "tools_via": "cli",
+  "claude_code_version": "2.1.299 (Claude Code)",
+  "model_used": "claude-sonnet-5-5",
+  "mcp_servers": [],
+  "outcome": "success",
+  "terminal_reason": "completed",
+  "is_error": false,
+  "turns": 81,
+  "duration_s": 461,
+  "session_id": "dd10d0a6-4deb-4670-a0bf-762dd1d64f15",
+  "cost_estimate_usd": 1.3265005699999999,
+  "final_message": "I recorded 22 papers and wrote the review. That is below the 25–40 target. Only 4 papers were read from PDF pages. Of the rest, 3 were read through Europe PMC text and 15 are abstract-only.\n\n**Our dataset.** It is confirmed as Lumpe & Stanković (PNAS 2021). Labels come from periodic Euler–Bernoulli beam finite-element homogenization of circular struts, with Es = 1 MPa and nu_s = 0.3. Every structure is at rho_rel = 0.01, so your 1% inference is right and the scatter is the rounding of C and n. The PNAS PDF would not load in `read_pdf`, so I read its Methods through Europe PMC. That text has no page numbers, and the supplementary information was not read.\n\n**Most relevant papers**\n1. **Grega et al. 2024 (ICLR):** the MACE-based equivariant GNN with a positive semi-definite output layer, built on a Lumpe-derived dataset (8,954 lattices after cleaning, plus node perturbations). Without that layer, 30% of lattices got negative eigenvalues. Their L_comp errors are not in log10 units, so they are not a baseline for us.\n2. **Indurkar et al. 2022:** a message-passing GNN with periodic edges on this same catalog (17,201 lattices). It classifies stretching vs bending (81.8% validation accuracy on a random split) and independently confirms rho = 0.01 and the E = Es·C·rho^n form.\n3. **Bastek 2022 and Zheng 2023:** precedents for predicting the 9 orthotropic constants, with different data, densities and beam models. They are not baselines for us.\n\n**Gaps I could not fill**\n- **Catalog counts:** four numbers are in play and I could not reconcile them: 17,087 in the paper, 17,201 in Indurkar, 17,221 and 17,262 in ours.\n- **The 41 small-member lattices:** the paper only says they were excluded for numerical issues. I found nothing else about how they were handled.\n- **How C and n were fitted:** the paper defers this to the supplementary information, which I did not read. It also leaves open whether node volumes are corrected in relative density.\n- **Baselines:** no published log10-modulus errors exist on this catalog, so you will need your own baselines.\n- **Defects:** the defect papers were abstract-only, so I have no knockdown numbers. I found no ML model of stiffness under strut waviness, diameter variation, missing struts or porosity. The only published setup I found is the node-perturbation FE dataset in Grega 2024 (nodal perturbation only).\n- **Not read:** Dallago 2019 was not read or recorded, and the JMPS companion to Grega 2024 is abstract-only.\n\nThe review has a correction note on Section 5. Meyer 2024, Frey 2025 and Zheng 2023 surfaced in searches, but I did not confirm they use this catalog.\n\nFiles are in `D:\\Users\\jcarpent\\Documents\\lattice-gnn\\literature_review\\main\\`:\n- `lit_review.md`\n\nSources:\n- [PMC7896306](https://pmc.ncbi.nlm.nih.gov/articles/PMC7896306)\n- [arXiv 2401.16914](https://arxiv.org/abs/2401.16914v2)\n- [arXiv 2202.09427](https://arxiv.org/abs/2202.09427v2)"
+}
