@@ -29,30 +29,33 @@ def main():
     lattices = read_lattices(args.path, strict=False)
     print(f"Parsed {len(lattices)} lattices from {args.path}\n")
 
-    problems = {"Z_avg mismatch": [], "Poisson asymmetry": [], "C not positive definite": []}
+    problems = {"Z_avg mismatch": [], "Poisson asymmetry": [], "C not positive definite": [],
+                "No properties (can't train on)": []}
     for n, lat in enumerate(lattices):
         g = build_periodic_graph(lat)
-        z_ok = abs(g.z_avg - lat.z_avg) < 0.01
-        nu_err = poisson_symmetry_error(lat.props)
-        min_eig = np.linalg.eigvalsh(stiffness_matrix(lat.props)).min()
-
+        z_ok = lat.z_avg is None or abs(g.z_avg - lat.z_avg) < 0.01
         if not z_ok:
             problems["Z_avg mismatch"].append(lat.name)
-        if nu_err > NU_TOL:
-            problems["Poisson asymmetry"].append(lat.name)
-        if min_eig <= 0:
-            problems["C not positive definite"].append(lat.name)
+        if lat.props is None:
+            problems["No properties (can't train on)"].append(lat.name)
+        else:
+            if poisson_symmetry_error(lat.props) > NU_TOL:
+                problems["Poisson asymmetry"].append(lat.name)
+            if np.linalg.eigvalsh(stiffness_matrix(lat.props)).min() <= 0:
+                problems["C not positive definite"].append(lat.name)
 
         if n < args.show:
             print(f"{lat.name}")
             print(f"  nodes {len(lat.nodes)} -> {len(g.frac)} unique, "
                   f"bars {len(lat.bars)} -> {len(g.edges)} unique")
-            print(f"  Z_avg graph {g.z_avg:.2f}, file {lat.z_avg:.2f}  {'OK' if z_ok else 'MISMATCH'}")
-            # Round-trip through the training targets, so this shows what the model's
-            # predictions look like once converted back to the file's properties.
-            props = props_from_target(target_vector(lat.props))
-            print("  " + ", ".join(f"{k}={props[k]:.2E}" for k in MODULI))
-            print("  " + ", ".join(f"{k}={props[k]:.3f}" for k in POISSON))
+            file_z = "not given" if lat.z_avg is None else f"{lat.z_avg:.2f}"
+            print(f"  Z_avg graph {g.z_avg:.2f}, file {file_z}  {'OK' if z_ok else 'MISMATCH'}")
+            if lat.props is not None:
+                # Round-trip through the training targets, so this shows what the model's
+                # predictions look like once converted back to the file's properties.
+                props = props_from_target(target_vector(lat.props))
+                print("  " + ", ".join(f"{k}={props[k]:.2E}" for k in MODULI))
+                print("  " + ", ".join(f"{k}={props[k]:.3f}" for k in POISSON))
             print()
 
     print("Summary")

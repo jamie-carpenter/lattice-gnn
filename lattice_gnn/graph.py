@@ -18,6 +18,8 @@ MODULI = ("Ex", "Ey", "Ez", "Gyz", "Gxz", "Gxy")   # Voigt order: xx, yy, zz, yz
 PAIRS = (("y", "z"), ("x", "z"), ("x", "y"))
 TARGET_NAMES = ("log10_Ex", "log10_Ey", "log10_Ez", "log10_Gyz", "log10_Gxz", "log10_Gxy",
                 "c_yz", "c_xz", "c_xy")
+# What to call each target in printed results.
+DISPLAY_NAMES = ("Ex", "Ey", "Ez", "Gyz", "Gxz", "Gxy", "Poisson yz", "Poisson xz", "Poisson xy")
 MIN_MODULUS = 1e-12   # floor before log10, in case a modulus is reported as 0
 
 
@@ -89,17 +91,19 @@ def build_periodic_graph(lat: Lattice, tol: float = 1e-4) -> PeriodicGraph:
     return PeriodicGraph(frac, frac @ L, edges, offsets, vectors, L)
 
 
-def edge_features(vectors: np.ndarray) -> np.ndarray:
-    """[length, n_x, n_y, n_z, n⊗n (xx, yy, zz, yz, xz, xy)] per bar.
+def edge_features(vectors):
+    """[length, n_x, n_y, n_z, n⊗n (xx, yy, zz, yz, xz, xy)] per bar, from a (E, 3) torch tensor.
 
     n⊗n is the same for both directions of a bar and is what a bar's axial
     stiffness contributes to the effective stiffness tensor.
     """
-    length = np.linalg.norm(vectors, axis=1, keepdims=True)
+    import torch
+
+    length = vectors.norm(dim=1, keepdim=True)
     n = vectors / length
-    nn = np.stack([n[:, 0]**2, n[:, 1]**2, n[:, 2]**2,
-                   n[:, 1] * n[:, 2], n[:, 0] * n[:, 2], n[:, 0] * n[:, 1]], axis=1)
-    return np.hstack([length, n, nn])
+    nn = torch.stack([n[:, 0]**2, n[:, 1]**2, n[:, 2]**2,
+                      n[:, 1] * n[:, 2], n[:, 0] * n[:, 2], n[:, 0] * n[:, 1]], dim=1)
+    return torch.cat([length, n, nn], dim=1)
 
 
 def _moduli(props: dict) -> dict:
@@ -159,15 +163,16 @@ def stiffness_matrix(props: dict) -> np.ndarray:
     return np.linalg.inv(compliance_matrix(props))
 
 
-def to_pyg(lat: Lattice, tol: float = 1e-4):
+def to_pyg(lat: Lattice, tol: float = 1e-4, with_targets: bool = True):
     """Build a torch_geometric Data object for one lattice.
 
     x          (N, 1)    node coordination number
     edge_index (2, 2E)   both directions of every bar
+    edge_vec   (2E, 3)   cartesian bar vectors (used to redo edge_attr after augmentation)
     edge_attr  (2E, 10)  see edge_features
     u          (1, 2)    graph-level: [Z_avg, log10(total bar length / cell volume)]
-    y          (1, 9)    see TARGET_NAMES
-    C          (1, 6, 6) orthotropic stiffness matrix, for evaluation
+    y          (1, 9)    see TARGET_NAMES             } only if with_targets and the
+    C          (1, 6, 6) orthotropic stiffness matrix } file gives properties
     """
     import torch
     from torch_geometric.data import Data
@@ -175,19 +180,21 @@ def to_pyg(lat: Lattice, tol: float = 1e-4):
     g = build_periodic_graph(lat, tol)
     src = np.concatenate([g.edges[:, 0], g.edges[:, 1]])
     dst = np.concatenate([g.edges[:, 1], g.edges[:, 0]])
-    vec = np.concatenate([g.vectors, -g.vectors])
+    vec = torch.tensor(np.concatenate([g.vectors, -g.vectors]), dtype=torch.float32)
     degree = np.bincount(src, minlength=len(g.frac))
 
     volume = abs(np.linalg.det(g.lattice))
     total_length = np.linalg.norm(g.vectors, axis=1).sum()
 
-    return Data(
+    data = Data(
         x=torch.tensor(degree[:, None], dtype=torch.float32),
         edge_index=torch.tensor(np.stack([src, dst]), dtype=torch.long),
-        edge_attr=torch.tensor(edge_features(vec), dtype=torch.float32),
-        pos=torch.tensor(g.pos, dtype=torch.float32),
+        edge_vec=vec,
+        edge_attr=edge_features(vec),
         u=torch.tensor([[g.z_avg, np.log10(total_length / volume)]], dtype=torch.float32),
-        y=torch.tensor(target_vector(lat.props)[None], dtype=torch.float32),
-        C=torch.tensor(stiffness_matrix(lat.props)[None], dtype=torch.float64),
         name=lat.name,
     )
+    if with_targets and lat.props is not None:
+        data.y = torch.tensor(target_vector(lat.props)[None], dtype=torch.float32)
+        data.C = torch.tensor(stiffness_matrix(lat.props)[None], dtype=torch.float64)
+    return data

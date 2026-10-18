@@ -93,7 +93,8 @@ def lattice_traces(lat):
     ]
 
     summary = (f"<b>{lat.name}</b>  ·  {len(g.frac)} unique nodes, {len(g.edges)} unique struts  ·  "
-               f"Z_avg graph {g.z_avg:.2f} / file {lat.z_avg:.2f}"
+               f"Z_avg graph {g.z_avg:.2f}"
+               + (f" / file {lat.z_avg:.2f}" if lat.z_avg is not None else "")
                + ("  ·  file flags intersecting bars" if lat.intersecting else ""))
     return [(t, 1) for t in left] + [(t, 2) for t in right], summary
 

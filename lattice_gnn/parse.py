@@ -38,13 +38,14 @@ PROPERTY_KEYS = ("Ex", "Ey", "Ez", "Gyz", "Gxz", "Gxy",
 
 @dataclass
 class Lattice:
+    """One lattice. Properties are None when the file doesn't give them (unknown lattices)."""
     name: str
     other_names: list[str]
-    cell: np.ndarray          # (6,) a, b, c, alpha, beta, gamma (degrees)
-    z_avg: float              # average connectivity reported in the file
-    props: dict[str, float]   # Ex ... nuyx, see PROPERTY_KEYS
-    scaling_C: np.ndarray     # (3,) Cx, Cy, Cz  (E_i ~ C_i * rho^n_i)
-    scaling_n: np.ndarray     # (3,) nx, ny, nz
+    cell: np.ndarray                 # (6,) a, b, c, alpha, beta, gamma (degrees)
+    z_avg: float | None              # average connectivity reported in the file
+    props: dict[str, float] | None   # Ex ... nuyx, see PROPERTY_KEYS
+    scaling_C: np.ndarray | None     # (3,) Cx, Cy, Cz  (E_i ~ C_i * rho^n_i)
+    scaling_n: np.ndarray | None     # (3,) nx, ny, nz
     nodes: np.ndarray         # (N, 3) fractional coordinates
     bars: np.ndarray          # (M, 2) zero-based node indices
     e_max: float | None       # only reported when max stiffness is off-axis
@@ -79,6 +80,9 @@ def parse_record(text: str) -> Lattice:
     def value(key: str) -> float:
         return float(_find(rf"\b{key}\s*=\s*({FLOAT})", text, name).group(1))
 
+    def has(key: str) -> bool:
+        return re.search(rf"\b{key}\s*=", text) is not None
+
     e_max = re.search(rf"\bEmax\s*=\s*({FLOAT})", text)
 
     nodes = _find(r"Nodal positions:\s*\n(.*?)\n\s*Bar connectivities:",
@@ -89,10 +93,10 @@ def parse_record(text: str) -> Lattice:
         name=name,
         other_names=other_names,
         cell=cell,
-        z_avg=value("Z_avg"),
-        props={k: value(k) for k in PROPERTY_KEYS},
-        scaling_C=np.array([value(k) for k in ("Cx", "Cy", "Cz")]),
-        scaling_n=np.array([value(k) for k in ("nx", "ny", "nz")]),
+        z_avg=value("Z_avg") if has("Z_avg") else None,
+        props={k: value(k) for k in PROPERTY_KEYS} if has("Ex") else None,
+        scaling_C=np.array([value(k) for k in ("Cx", "Cy", "Cz")]) if has("Cx") else None,
+        scaling_n=np.array([value(k) for k in ("nx", "ny", "nz")]) if has("nx") else None,
         nodes=_rows(nodes, 3, name),
         bars=_rows(bars, 2, name).astype(int) - 1,
         e_max=float(e_max.group(1)) if e_max else None,
@@ -102,7 +106,7 @@ def parse_record(text: str) -> Lattice:
 
 def read_lattices(path: str | Path, strict: bool = True) -> list[Lattice]:
     """Parse every record in a file. With strict=False, bad records are skipped with a warning."""
-    text = Path(path).read_text()
+    text = Path(path).read_text(encoding="utf-8-sig")   # -sig: ignore a BOM some Windows tools add
     lattices = []
     for block in SEPARATOR.split(text):
         if "Name:" not in block:
