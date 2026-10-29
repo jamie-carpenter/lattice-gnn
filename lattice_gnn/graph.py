@@ -50,6 +50,19 @@ class PeriodicGraph:
     def z_avg(self) -> float:
         return 2 * len(self.edges) / len(self.frac)
 
+    def catalog_z_avg(self, tol: float = 1e-4) -> float:
+        """Z_avg as the catalog reports it (not the true average degree, see z_avg).
+
+        The catalog averages the degree over every image of each node in the closed
+        cell [0, 1]^3 (a corner node counts 8 times, a face node twice) and leaves out
+        2-connected nodes. Images are counted from the positions, not from the file's
+        node list, because the file sometimes omits a few (e.g. 6 of 8 corners).
+        """
+        degree = np.bincount(self.edges.ravel(), minlength=len(self.frac))
+        images = 2 ** (np.abs(self.frac) < tol).sum(axis=1)   # frac is wrapped into [0, 1)
+        keep = degree != 2
+        return (degree * images)[keep].sum() / images[keep].sum()
+
 
 def build_periodic_graph(lat: Lattice, tol: float = 1e-4) -> PeriodicGraph:
     # Merge nodes that are periodic copies of each other (differ by an integer vector).

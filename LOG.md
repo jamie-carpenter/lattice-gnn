@@ -1,5 +1,22 @@
 # Running log
 
+## 2026-10-29
+
+**Done**
+- Lab Report 2 to-do list (`docs/TODO.md`).
+- `Z_avg` check: the catalog's Z_avg is an averaging convention, not a graph bug. It averages
+  the degree over every image of each node in the closed cell (corner x8, edge x4, face x2) and
+  leaves out 2-connected nodes. The file sometimes omits images (e.g. 6 of 8 corners), so the
+  images are counted from the positions. Added `PeriodicGraph.catalog_z_avg`; `check_data.py`
+  uses it.
+- Full catalog (`check_data.py`): Z_avg mismatches 257 / 17,262 (1.5%), C not positive definite
+  4, no properties 40, Poisson asymmetry 0.
+
+**Remaining**
+- The 257 remaining Z_avg mismatches: a third have nodes just off a cell face (1e-4 to 2e-3).
+  Explain them or exclude them.
+- The 4 records whose stiffness matrix is not positive definite (e.g. `tet_Z03.7_E6457`).
+
 ## 2026-10-18
 
 **Done**
