@@ -8,3 +8,4 @@ numpy==2.5.3
 torch==2.14.1
 torch_geometric==2.8.0.post1
 plotly==7.1.0
+pytest==9.2.0

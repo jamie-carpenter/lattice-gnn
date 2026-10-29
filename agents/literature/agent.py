@@ -1,12 +1,14 @@
 """Run the literature-review agent non-interactively through Claude Code (`claude -p`).
 
 Uses your Claude Code sign-in (the course's Claude Enterprise seat), so there is no API key.
-The agent is defined in .claude/agents/literature-reviewer.md and its tools in server.py.
+The agent is defined in .claude/agents/literature-reviewer-cli.md (the MCP version in
+literature-reviewer.md) and its tools in server.py, reached through cli.py by default.
 For an interactive run instead, start `claude` in the repo and type: /literature-review [topic]
 
 Run from the repo root:
     python -m agents.literature                                  # default topic -> literature_review/main/
     python -m agents.literature "defects in AM strut lattices" --name defects
+    python -m agents.literature --via mcp                        # tools via the MCP server instead of cli.py
 
 Writes literature_review/<name>/: papers.json, lit_review.md, and run_info.json (pinned model ID,
 Claude Code version, turns, outcome), so each run can be audited and repeated.
@@ -25,6 +27,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVER = Path(__file__).with_name("server.py")
 DEFAULT_MODEL = "claude-sonnet-5-5"
+CLI_COMMAND = "python -m agents.literature.cli"
 
 
 def _short(d: dict, n: int = 110) -> str:
@@ -33,34 +36,41 @@ def _short(d: dict, n: int = 110) -> str:
     return s if len(s) <= n else s[:n] + "…"
 
 
-def build_command(claude: str, topic: str | None, name: str, model: str, max_turns: int) -> list[str]:
-    # Use this interpreter for the tool server, so the run does not depend on PATH or an active venv.
-    mcp_config = {"mcpServers": {"literature": {"type": "stdio", "command": sys.executable, "args": [str(SERVER)]}}}
+def build_command(claude: str, topic: str | None, name: str, model: str, max_turns: int,
+                  via: str = "cli") -> list[str]:
     prompt = f"Folder name: {name}\nTopic: {topic or '(none given: use your default topic)'}\n" \
              "Conduct the literature review."
+    if via == "mcp":
+        # Use this interpreter for the tool server, so the run does not depend on PATH or an active venv.
+        mcp_config = {"mcpServers": {"literature": {"type": "stdio", "command": sys.executable, "args": [str(SERVER)]}}}
+        agent, tools = "literature-reviewer", ["mcp__literature__*"]
+    else:
+        # Same tools through agents/literature/cli.py; Bash may run that one command and nothing else.
+        mcp_config = {"mcpServers": {}}
+        agent, tools = "literature-reviewer-cli", [f"Bash({CLI_COMMAND} *)"]
     return [
         claude, "-p", prompt,
-        "--agent", "literature-reviewer",          # tools + instructions from .claude/agents/
+        "--agent", agent,                          # tools + instructions from .claude/agents/
         "--model", model,                          # pinned model ID
         "--max-turns", str(max_turns),
         "--output-format", "stream-json", "--verbose",
         "--mcp-config", json.dumps(mcp_config), "--strict-mcp-config",
         # Fixed tool surface: anything not listed here is denied, never prompted.
         "--permission-mode", "dontAsk",
-        "--allowedTools", "WebSearch", "WebFetch", "mcp__literature__*",
+        "--allowedTools", "WebSearch", "WebFetch", *tools,
     ]
 
 
-def run(claude: str, topic: str | None, name: str, model: str, max_turns: int) -> int:
+def run(claude: str, topic: str | None, name: str, model: str, max_turns: int, via: str = "cli") -> int:
     out_dir = REPO_ROOT / "literature_review" / name
     out_dir.mkdir(parents=True, exist_ok=True)
     version = subprocess.run([claude, "--version"], capture_output=True, text=True).stdout.strip()
     info: dict = {
         "started_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "topic": topic, "name": name, "model_requested": model, "max_turns": max_turns,
-        "claude_code_version": version,
+        "tools_via": via, "claude_code_version": version,
     }
-    proc = subprocess.Popen(build_command(claude, topic, name, model, max_turns), cwd=REPO_ROOT,
+    proc = subprocess.Popen(build_command(claude, topic, name, model, max_turns, via), cwd=REPO_ROOT,
                             stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     result = None
     for line in proc.stdout:
@@ -72,7 +82,7 @@ def run(claude: str, topic: str | None, name: str, model: str, max_turns: int) -
             info["model_used"] = msg.get("model")
             info["mcp_servers"] = msg.get("mcp_servers")
             servers = {s.get("name"): s.get("status") for s in msg.get("mcp_servers") or []}
-            if servers.get("literature") != "connected":
+            if via == "mcp" and servers.get("literature") != "connected":
                 print(f"WARNING: literature tool server not connected: {servers}", flush=True)
         elif msg.get("type") == "assistant":
             for block in msg.get("message", {}).get("content", []):
@@ -80,7 +90,11 @@ def run(claude: str, topic: str | None, name: str, model: str, max_turns: int) -
                     print(f"\n{block['text'].strip()}\n", flush=True)
                 elif block.get("type") == "tool_use":
                     tool = block.get("name", "").removeprefix("mcp__literature__")
-                    print(f"  -> {tool}({_short(block.get('input') or {})})", flush=True)
+                    if tool == "Bash":
+                        line1 = (block.get("input") or {}).get("command", "").splitlines()[:1]
+                        print(f"  -> Bash: {line1[0] if line1 else ''}", flush=True)
+                    else:
+                        print(f"  -> {tool}({_short(block.get('input') or {})})", flush=True)
         elif msg.get("type") == "result":
             result = msg
     proc.wait()
@@ -111,6 +125,9 @@ def main() -> None:
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--max-turns", type=int, default=120)
     p.add_argument("--claude", help="path to the claude executable (default: found on PATH)")
+    p.add_argument("--via", choices=("cli", "mcp"), default="cli",
+                   help="reach the tools through the command line (cli.py, default; needs only the venv) "
+                        "or the MCP server (needs Claude Code to load project MCP servers)")
     args = p.parse_args()
     sys.stdout.reconfigure(errors="replace")  # Windows consoles can't print every symbol in paper text
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,60}", args.name):
@@ -119,4 +136,4 @@ def main() -> None:
     if not claude:
         sys.exit("Claude Code ('claude') was not found on PATH. Install it and sign in with your "
                  "Caltech account (claude auth login), or pass --claude <path>.")
-    sys.exit(run(claude, args.topic, args.name, args.model, args.max_turns))
+    sys.exit(run(claude, args.topic, args.name, args.model, args.max_turns, args.via))

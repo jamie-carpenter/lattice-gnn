@@ -1,0 +1,40 @@
+[
+  {
+    "title": "Exploring the property space of periodic cellular structures based on crystal networks",
+    "authors": "Thomas S. Lumpe, Tino Stankovic",
+    "year": 2021,
+    "identifier": "10.1073/pnas.2003504118",
+    "category": "dataset",
+    "relevance": 5,
+    "summary": "Catalog of periodic strut networks from RCSR and EPINET, homogenized with an Euler-Bernoulli FE beam model at rho_rel ~0.01; analyses stretch/bending dominance via E/Es ~ rho^n and average connectivity Za.",
+    "relevance_to_project": "Likely source of our dataset (names with Z and RCSR symbols, E/Es=C rho^n, n=1 or 2). Paper reports 17,087 entries vs 17,262 in our catalog: the ETH Research Collection catalog may be a different version; the 41 very-small-member entries probably relate to the 40 excluded entries but this is not confirmed. SI (not read) holds C/n details.",
+    "fulltext_source": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7896306/fullTextXML",
+    "venue": "PNAS",
+    "evidence": [
+      {
+        "claim": "Homogenization is Euler-Bernoulli FE beam model",
+        "location": "Methods (Europe PMC XML; no PDF page read)",
+        "page": 0,
+        "quote": "a numerical homogenization approach (34) based on an Euler–Bernoulli finite-element beam model"
+      },
+      {
+        "claim": "All structures scaled to rho_rel=0.01 at bar radius 0.1 mm; Es=1 MPa, nu_s=0.3",
+        "location": "Methods / Section 2",
+        "page": 0,
+        "quote": "all structures are scaled to a relative density of ρ̄ ∼ = 0.01"
+      },
+      {
+        "claim": "Catalog count and exclusion of very small members",
+        "location": "Methods",
+        "page": 0,
+        "quote": "2,730 + 14,532 − 135 − 40 = 17,087 ... structures with very small members that cause numerical issues"
+      },
+      {
+        "claim": "n=1 stretch, n=2 bending; no C value in main text",
+        "location": "Section 2",
+        "page": 0,
+        "quote": "The scaling exponent n indicates stretch- (n=1) or bending-dominated (n=2) behavior"
+      }
+    ]
+  }
+]
