@@ -37,6 +37,26 @@ def test_family_split_keeps_families_and_duplicates_together(tmp_path):
     assert load_split(tmp_path / "s.json") == split
 
 
+def test_family_split_cap_and_stratify():
+    names = [f"cub_Z04.0_E{i}" for i in range(50)]                  # one big family
+    names += [f"{s}_Z0{z}.0_E{i}" for s in ("tet", "hex") for z in range(3, 9) for i in range(3)]
+    split = family_split(names, 0.2, 0.2, seed=0, max_family=10, stratify=True)
+    assert "cub_Z04.0" in split["train"]
+    for part in ("val", "test"):
+        assert {f.split("_")[0] for f in split[part]} == {"tet", "hex"}
+
+
+def test_locked_split_unchanged():
+    """splits/main.json is frozen: regenerating it from the catalog must give the same file."""
+    from lattice_gnn.splits import read_duplicates, read_names
+    catalog = "Unit_Cell_Catalog/Unit_Cell_Catalog.txt"
+    locked = load_split("splits/main.json")
+    meta = locked["meta"]
+    again = family_split(read_names(catalog), meta["val_frac"], meta["test_frac"], meta["seed"],
+                         read_duplicates(catalog), meta["max_family"], meta["stratify"])
+    assert all(again[p] == locked[p] for p in ("train", "val", "test"))
+
+
 def test_apply_split_rejects_unknown(graphs):
     with pytest.raises(ValueError):
         apply_split(graphs, {"by": "family", "train": [], "val": [], "test": []})

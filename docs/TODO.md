@@ -39,7 +39,8 @@ Design: `docs/agent_design_worksheet.md`.
       names; `family_split` keeps their families in one part (`read_duplicates`)
 - [x] Save a split to `splits/<name>.json` (family names per train / val / test) and load it back
 - [x] `train.py --split-file splits/<name>.json` so every run uses the same frozen split
-- [ ] Freeze the locked test split once; never change it afterwards
+- [x] Freeze the locked test split once; never change it afterwards (`splits/main.json`,
+      2026-10-30: `--max-family 200 --stratify`)
 
 ## 4. Evaluation tool
 

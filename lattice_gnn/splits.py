@@ -4,8 +4,9 @@ A split file lists *family* names (see `family`) for each part, so it can be mad
 from the full catalog and applied to any subset of it: a lattice's part depends only on
 its family, never on which other lattices happen to be in the file.
 
-Freeze a split from the full catalog:
-    python -m lattice_gnn.splits Unit_Cell_Catalog/Unit_Cell_Catalog.txt --out splits/main.json
+The locked split (frozen 2026-10-30; never regenerate or edit it) was made with:
+    python -m lattice_gnn.splits Unit_Cell_Catalog/Unit_Cell_Catalog.txt --out splits/main.json \
+        --max-family 200 --stratify
 """
 from __future__ import annotations
 
@@ -44,10 +45,20 @@ def read_duplicates(path: str | Path) -> list[tuple[str, str]]:
             for other in others.split(",") if other.strip() in names and other.strip() != name]
 
 
-def family_split(names, val_frac: float, test_frac: float, seed: int, duplicates=()) -> dict:
+def crystal_system(name: str) -> str:
+    """cub, tet, ort, hex, trig or mon: the prefix of every catalog name."""
+    return name.split("_")[0]
+
+
+def family_split(names, val_frac: float, test_frac: float, seed: int, duplicates=(),
+                 max_family: int | None = None, stratify: bool = False) -> dict:
     """Whole families go to test, then val, until each holds its fraction of the lattices.
 
     Families linked by a duplicate pair (see read_duplicates) move together.
+    max_family: families with more lattices than this always go to train, so no single
+        family can make up most of val or test.
+    stratify: fill test and val separately within each crystal system, each to its share
+        of that system's lattices, so every system is represented in proportion.
     """
     root = {}
 
@@ -61,21 +72,32 @@ def family_split(names, val_frac: float, test_frac: float, seed: int, duplicates
     groups = {}
     for name in names:
         groups.setdefault(find(family(name)), []).append(name)
-    keys = sorted(groups)
-    random.Random(seed).shuffle(keys)
+    strata = {}   # stratum -> group keys; one stratum ("all") unless stratify
+    for key in sorted(groups):
+        strata.setdefault(crystal_system(key) if stratify else "all", []).append(key)
+    rng = random.Random(seed)
     split = {part: [] for part in PARTS}
     counts = dict.fromkeys(PARTS, 0)
-    for key in keys:
-        if counts["test"] < test_frac * len(names):
-            part = "test"
-        elif counts["val"] < val_frac * len(names):
-            part = "val"
-        else:
-            part = "train"
-        split[part] += {family(n) for n in groups[key]}
-        counts[part] += len(groups[key])
+    for stratum in sorted(strata):
+        keys = strata[stratum]
+        total = sum(len(groups[k]) for k in keys)
+        rng.shuffle(keys)
+        filled = dict.fromkeys(PARTS, 0)
+        for key in keys:
+            if max_family is not None and len(groups[key]) > max_family:
+                part = "train"
+            elif filled["test"] < test_frac * total:
+                part = "test"
+            elif filled["val"] < val_frac * total:
+                part = "val"
+            else:
+                part = "train"
+            split[part] += {family(n) for n in groups[key]}
+            filled[part] += len(groups[key])
+            counts[part] += len(groups[key])
     return {"by": "family", **{part: sorted(split[part]) for part in PARTS},
-            "meta": {"val_frac": val_frac, "test_frac": test_frac, "seed": seed, "lattices": counts}}
+            "meta": {"val_frac": val_frac, "test_frac": test_frac, "seed": seed,
+                     "max_family": max_family, "stratify": stratify, "lattices": counts}}
 
 
 def random_split(names, val_frac: float, test_frac: float, seed: int) -> dict:
@@ -127,6 +149,10 @@ def main():
     parser.add_argument("--val-frac", type=float, default=0.1)
     parser.add_argument("--test-frac", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--max-family", type=int, default=None,
+                        help="families with more lattices than this always go to train")
+    parser.add_argument("--stratify", action="store_true",
+                        help="fill val and test within each crystal system")
     parser.add_argument("--force", action="store_true", help="overwrite an existing split file")
     args = parser.parse_args()
 
@@ -136,7 +162,8 @@ def main():
     names = [n for path in args.paths for n in read_names(path)]
     if args.by == "family":
         duplicates = [pair for path in args.paths for pair in read_duplicates(path)]
-        split = family_split(names, args.val_frac, args.test_frac, args.seed, duplicates)
+        split = family_split(names, args.val_frac, args.test_frac, args.seed, duplicates,
+                             args.max_family, args.stratify)
     else:
         split = random_split(names, args.val_frac, args.test_frac, args.seed)
     split["meta"]["source"] = [str(p) for p in args.paths]

@@ -28,8 +28,16 @@
     mon_Z05.7 (183%, n=6). Several have only 1-2 val lattices, so per-family numbers are noisy.
   - Study cost at this speed: ~10 min per default-size run, so 4-10 h for a 40-run study.
 
+- Locked split frozen: `splits/main.json` (seed 0, 10% val / 10% test, `--max-family 200
+  --stratify`). Family = crystal system + Z (456 families). In the uncapped draft, one family
+  (tet_Z04.0, 1,000 lattices) was 56% of test, so families over 200 lattices (18 families,
+  6,062 lattices) always go to train, and val/test are filled within each crystal system.
+  Result: 13,295 / 2,039 / 1,928 lattices in 325 / 67 / 64 families; largest test family 7%
+  of test; each crystal system has 10-16% of its lattices in test. The test set measures new
+  small-to-medium families. `tests/test_baseline.py` checks the file regenerates unchanged.
+
 **Remaining**
-- Decide the family definition and freeze the locked split as `splits/main.json`.
+- Rerun `first-real-2000` on `splits/main.json` (it used the draft split).
 - Set the `config/loop.yaml` thresholds from the spec (placeholders now).
 - Menu switches (TODO section 7) for the study to search, starting with the PD head.
 - Decide the study budget (40 runs x 100 epochs is 4-10 h per study on the laptop).
