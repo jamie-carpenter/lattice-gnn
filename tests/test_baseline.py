@@ -107,3 +107,13 @@ def test_tiny_study(tmp_path, graphs):
     assert len(trials["trials"]) == 3
     assert final["check"]["reason"].startswith("budget")
     assert {"lr", "layers", "augment"} <= set(trials["trials"][0]["params"])
+
+
+def test_report_writes_tables_and_figures(tmp_path, graphs):
+    from lattice_gnn.report import build_report
+    run_id = train(tiny(tmp_path, run_id="r"), graphs=graphs)
+    out = build_report(tmp_path / run_id)
+    for name in ("report.md", "loss.png", "targets.png", "families.png"):
+        assert (out / name).stat().st_size > 0
+    text = (out / "report.md").read_text(encoding="utf-8")
+    assert "## Positive definiteness" in text and "Ex" in text
