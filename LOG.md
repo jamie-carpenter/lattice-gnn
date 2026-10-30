@@ -1,5 +1,26 @@
 # Running log
 
+## 2026-10-30
+
+**Done**
+- Optimizer baseline (Baseline 2) pipeline, TODO sections 3, 4, 6 and 8:
+  `lattice_gnn/splits.py` (frozen family splits), `lattice_gnn/evaluate.py` (per-target and
+  per-family errors, PD check on the 3 couplings), `lattice_gnn/training.py` (`train(config)`,
+  seeded, writes `runs/<id>/`), `lattice_gnn/optimize.py` + `config/loop.yaml` (Optuna study,
+  `check_target`). Tests: `tests/test_baseline.py`.
+- `family()` fix: it only stripped `_E<n>`, so each RCSR `_R<n>` lattice was its own family.
+  The catalog has 456 families. 135 duplicates appear under an `_E` and an `_R` name; 6 of them
+  carry a different Z in the two names, and the split now keeps those families together.
+- `scripts/make_subset.py`: 17,222 complete records (40 without properties).
+- Draft family split `splits/draft.json` (seed 0, 10/10%): 13,741 / 1,745 / 1,776 lattices.
+- Tiny study (300-lattice subset, 6 runs x 5 epochs) runs end to end in ~30 s; numbers are
+  meaningless at that size.
+
+**Remaining**
+- Decide the family definition and freeze the locked split as `splits/main.json`.
+- Set the `config/loop.yaml` thresholds from the spec (placeholders now).
+- First real run (TODO section 5), then the menu switches (section 7) for the study to search.
+
 ## 2026-10-29
 
 **Done**

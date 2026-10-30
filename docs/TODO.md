@@ -28,26 +28,29 @@ Design: `docs/agent_design_worksheet.md`.
       (`problems["Z_avg mismatch"]`) as excluded / flagged
 - [ ] Find out why 40 records lack properties (LR1 said 41); note it in `LOG.md`
 - [ ] Count lattices per family (`family()` in `train.py`); note the smallest/largest families
-- [ ] Write `scripts/make_subset.py`: every k-th complete record -> subset file (catalog is
+- [x] Write `scripts/make_subset.py`: every k-th complete record -> subset file (catalog is
       sorted by cell size, so never take the first N)
 
 ## 3. Splits
 
-- [ ] Move `family()` and `split_dataset()` out of `train.py` into `lattice_gnn/splits.py`
-- [ ] Save a split to `splits/<name>.json` (family names per train / val / test) and load it back
-- [ ] `train.py --split-file splits/<name>.json` so every run uses the same frozen split
+- [x] Move `family()` and `split_dataset()` out of `train.py` into `lattice_gnn/splits.py`.
+      Fixed on the way: `family()` only stripped `_E<n>`, so every RCSR `_R<n>` lattice was its
+      own family (456 families, not ~3,100). 6 duplicate pairs have different Z in their two
+      names; `family_split` keeps their families in one part (`read_duplicates`)
+- [x] Save a split to `splits/<name>.json` (family names per train / val / test) and load it back
+- [x] `train.py --split-file splits/<name>.json` so every run uses the same frozen split
 - [ ] Freeze the locked test split once; never change it afterwards
 
 ## 4. Evaluation tool
 
-- [ ] `lattice_gnn/evaluate.py`: errors per target (move `metrics()` out of `train.py`)
-- [ ] Add errors per family (median % error on moduli, abs error on couplings)
-- [ ] Add PD check: rebuild the 6x6 stiffness from predictions (`props_from_target` ->
+- [x] `lattice_gnn/evaluate.py`: errors per target (move `metrics()` out of `train.py`)
+- [x] Add errors per family (median % error on moduli, abs error on couplings)
+- [x] Add PD check: rebuild the 6x6 stiffness from predictions (`props_from_target` ->
       `stiffness_matrix`), count non-positive-definite cases per family
-- [ ] Derive the PD threshold from the math (smallest eigenvalue > 0, tolerance from float
+- [x] Derive the PD threshold from the math (smallest eigenvalue > 0, tolerance from float
       precision), write the reasoning in a comment
-- [ ] `evaluate.py` writes `runs/<id>/eval.json` (the report the agent will read)
-- [ ] Unit test: evaluate on the sample file returns all fields
+- [x] `evaluate.py` writes `runs/<id>/eval.json` (the report the agent will read)
+- [x] Unit test: evaluate on the sample file returns all fields
 
 ## 5. First real run
 
@@ -57,10 +60,10 @@ Design: `docs/agent_design_worksheet.md`.
 
 ## 6. Training as a tool
 
-- [ ] Refactor `train.py` so training is a function `train(config) -> run_id` (keep the CLI)
-- [ ] Every run writes `runs/<id>/` (config, metrics, checkpoint path) by itself
-- [ ] Fix all seeds (torch, numpy, random, DataLoader) from `config["seed"]`
-- [ ] Check: two runs with the same seed give near-identical metrics
+- [x] Refactor `train.py` so training is a function `train(config) -> run_id` (keep the CLI)
+- [x] Every run writes `runs/<id>/` (config, metrics, checkpoint path) by itself
+- [x] Fix all seeds (torch, numpy, random, DataLoader) from `config["seed"]`
+- [x] Check: two runs with the same seed give near-identical metrics
 
 ## 7. Menu config and switches
 
@@ -75,12 +78,12 @@ Design: `docs/agent_design_worksheet.md`.
 
 ## 8. Baseline 2 (Optuna)
 
-- [ ] Add `optuna` to `requirements.txt` (pinned)
-- [ ] `lattice_gnn/optimize.py`: Optuna study over hyperparameter ranges + menu switches from
+- [x] Add `optuna` to `requirements.txt` (pinned)
+- [x] `lattice_gnn/optimize.py`: Optuna study over hyperparameter ranges + menu switches from
       `config/loop.yaml`, fixed sampler seed, budget = number of training runs
-- [ ] Save trial history to `runs/<study>/trials.json`
-- [ ] `check_target(eval, thresholds, budget) -> continue | stop(reason)` in plain code
-- [ ] Run a tiny study (e.g. 6 runs, few epochs) end to end
+- [x] Save trial history to `runs/<study>/trials.json`
+- [x] `check_target(eval, thresholds, budget) -> continue | stop(reason)` in plain code
+- [x] Run a tiny study (e.g. 6 runs, few epochs) end to end
 
 ## 9. Agent
 

@@ -1,0 +1,41 @@
+# Settings for the optimizer baseline (lattice_gnn.optimize) and, later, the agent loop.
+# Every training run in a study uses the same data, split and fixed settings; only the
+# `search` and `menu` entries vary.
+
+data:
+  paths: [data/raw/subset_2000.txt]   # scripts/make_subset.py
+  split_file: splits/main.json        # frozen once: python -m lattice_gnn.splits
+
+training:          # fixed for every run (any key of lattice_gnn.training.DEFAULTS)
+  epochs: 100
+  patience: 20
+  seed: 0
+
+# Hyperparameter ranges. float/int: low, high, optional log; categorical: choices.
+search:
+  lr:           {type: float, low: 1.0e-4, high: 3.0e-3, log: true}
+  weight_decay: {type: float, low: 1.0e-7, high: 1.0e-3, log: true}
+  hidden:       {type: categorical, choices: [64, 128, 256]}
+  layers:       {type: int, low: 2, high: 6}
+  batch_size:   {type: categorical, choices: [32, 64, 128]}
+
+# Structural menu: each option is a categorical setting the optimizer may switch.
+# TODO section 7 adds pd_head, physics_residual and family_balanced_loss here once
+# training supports them.
+menu:
+  augment: [true, false]
+
+optimizer:
+  sampler_seed: 0
+  objective: loss     # loss | median_percent_error_moduli | median_abs_error_couplings | non_pd_rate
+
+budget:
+  runs: 40            # training runs per study
+  no_progress: 10     # stop after this many runs without a new best
+
+# Success: every threshold met on the validation families.
+# PLACEHOLDERS - set from the spec (agent_design_worksheet.md section 9), not by eye.
+thresholds:
+  median_percent_error_moduli: 10.0
+  median_abs_error_couplings: 0.05
+  non_pd_rate: 0.0
