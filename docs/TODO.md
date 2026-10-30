@@ -54,9 +54,10 @@ Design: `docs/agent_design_worksheet.md`.
 
 ## 5. First real run
 
-- [ ] Strided 2,000-lattice subset, frozen split, train 100 epochs
-- [ ] Save `runs/<id>/config.json` (all arguments, seed, git commit) and `eval.json`
-- [ ] Log the results in `LOG.md`
+- [x] Strided 2,000-lattice subset, frozen split, train 100 epochs (draft split; rerun on
+      `splits/main.json` once it is frozen)
+- [x] Save `runs/<id>/config.json` (all arguments, seed, git commit) and `eval.json`
+- [x] Log the results in `LOG.md`
 
 ## 6. Training as a tool
 

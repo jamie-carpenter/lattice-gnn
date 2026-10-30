@@ -15,11 +15,24 @@
 - Draft family split `splits/draft.json` (seed 0, 10/10%): 13,741 / 1,745 / 1,776 lattices.
 - Tiny study (300-lattice subset, 6 runs x 5 epochs) runs end to end in ~30 s; numbers are
   meaningless at that size.
+- First real run, `runs/first-real-2000` (not committed; `runs/` is ignored):
+  `python train.py data/raw/subset_2000.txt --split-file splits/draft.json --epochs 100 --run-id first-real-2000`.
+  1,603 train / 184 val lattices (36 val families), default model (4 layers, width 128,
+  581k parameters), seed 0. 100 epochs in 10.5 min on the laptop CPU (6.3 s/epoch); best epoch 91.
+  - Loss (standardized MSE; 1.0 = predicting the training mean): train 0.079, val 0.247.
+    Val was still creeping down at epoch 100; the train/val gap is large.
+  - Validation: R2 0.72-0.82 on the moduli, 0.66-0.69 on the couplings. Median error 53% on
+    the moduli (43-76% per modulus, Gxy worst), 0.071 abs on the couplings.
+  - Non-PD predictions: 12 / 184 (6.5%); all true labels are PD. No PD head yet.
+  - Worst families: trig_Z07.9 (432%, n=2), tet_Z08.7 (304%, n=1), trig_Z11.1 (257%, n=1),
+    mon_Z05.7 (183%, n=6). Several have only 1-2 val lattices, so per-family numbers are noisy.
+  - Study cost at this speed: ~10 min per default-size run, so 4-10 h for a 40-run study.
 
 **Remaining**
 - Decide the family definition and freeze the locked split as `splits/main.json`.
 - Set the `config/loop.yaml` thresholds from the spec (placeholders now).
-- First real run (TODO section 5), then the menu switches (section 7) for the study to search.
+- Menu switches (TODO section 7) for the study to search, starting with the PD head.
+- Decide the study budget (40 runs x 100 epochs is 4-10 h per study on the laptop).
 
 ## 2026-10-29
 
