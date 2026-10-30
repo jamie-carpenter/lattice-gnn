@@ -63,7 +63,7 @@ def plot_loss(history: dict, out: Path):
     ax.legend(loc="lower left")
     ax_lr.plot(x, [e["lr"] for e in epochs], color=SERIES[0])
     ax_lr.set_yscale("log")
-    ax_lr.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.0e"))
+    ax_lr.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3g"))
     ax_lr.yaxis.set_minor_locator(matplotlib.ticker.NullLocator())
     ax_lr.set_yticks(sorted({e["lr"] for e in epochs}))
     ax_lr.set_ylabel("learning rate")
