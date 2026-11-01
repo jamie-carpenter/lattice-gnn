@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[margin=0.85in]{geometry}
+\usepackage[margin=0.75in]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -52,232 +52,186 @@ ever chooses to retune, the optimizer alone will match its error at the same bud
 negative outcome would show that the agentic layer adds nothing over the non-agent baseline.
 
 \subsection*{A2 \quad Related work}
-\rework{rebuild A2 from the retrieval agent over my corpus; read and check \cite{ferreira},
-\cite{huai}, \cite{osaro} (agent-found, abstract and pages unchecked); check every page citation;
-Optuna citation pending.}
+% TODO: Optuna citation pending; rebuild A2 with the retrieval agent later.
+% Papers and page citations checked by Jamie on 2026-11-01.
 \textbf{Domain.} Lumpe and Stankovi\'c~\cite{lumpe} built the catalog by decoding crystal networks
-into periodic strut lattices. They computed the effective stiffness of each lattice by FE
-homogenization with Euler--Bernoulli beams, for a base material with $E_s = 1$\,MPa and
-$\nu_s = 0.3$ at a relative density of $\rhob = 0.01$. Indurkar et al.~\cite{indurkar} trained a
-message-passing GNN on 17,201 lattices from the same catalog [p.~1], with periodic edges that link
-boundary nodes to the neighbouring cells [p.~3]. Their network classifies lattices as stretching-
-or bending-dominated rather than predicting stiffness, and it reaches 81.8\% validation accuracy on
-a random 90:10 split [p.~4]. A random split places near-identical lattices in both the training
-and validation sets, which is why this project holds out whole lattice families instead. Grega et
-al.~\cite{grega} predicted the full stiffness tensor with an equivariant GNN trained on a cleaned
-subset of 8,954 base lattices [p.~5]. Without constraints, their model predicted negative
+into periodic strut lattices and computed the effective stiffness of each lattice by FE
+homogenization with Euler--Bernoulli beams ($E_s = 1$\,MPa, $\nu_s = 0.3$, $\rhob = 0.01$).
+Indurkar et al.~\cite{indurkar} trained a message-passing GNN with periodic edges on 17,201
+lattices from the same catalog [pp.~1, 3], but to classify lattices as stretching- or
+bending-dominated, and reached 81.8\% validation accuracy on a random 90:10 split [p.~4]. Because a
+random split places near-identical lattices on both sides, this project holds out whole families
+instead. Grega et al.~\cite{grega} predicted the full stiffness tensor with an equivariant GNN
+trained on 8,954 base lattices [p.~5]. Without constraints, their model predicted negative
 eigenvalues for 30\% of lattices, and a positive-semi-definite output layer removed them [p.~7].
 This result motivates both the positive-definiteness (PD) check and the PD output layer on the
-structural menu. The
-literature review found no published stiffness-prediction errors on this catalog that are
-directly comparable to mine, so all baselines in this project are my own.
-\textbf{Agents.} Ferreira et al.~\cite{ferreira} compared LLM agents with classical
-hyperparameter optimizers under the same 24-hour budget. In a fixed search space, CMA-ES and TPE
-consistently outperformed the agents [p.~1], and the best method was a hybrid in which the LLM
-acts only as an occasional informed perturbation [pp.~5, 8]. Huai et al.~\cite{huai} reached a
-different result in a sequential setting, where an agent reads the training logs and makes five
-interventions after a baseline run [p.~7]. There the strongest agent scored above the conventional
-optimizers [p.~8], although agents still struggled with sustained refinement and complex log
-diagnosis [p.~1]. Osaro et al.~\cite{osaro} let LLM agents edit the training code of a MACE
-interatomic potential and accept or revert each change against a fixed, physically constrained
-scorecard [p.~1]. Its hard gates rejected a change that lowered the energy error but violated an
-energy-drift limit [p.~3], which is the role the PD check plays here. Together, these studies
-suggest that an agent is most likely to help when the budget is short and the decision draws on
-information an optimizer does not see. The search found no work that applies such an agent to a
-GNN surrogate for lattice stiffness.
+structural menu. No published errors on this catalog are directly comparable to mine, so all
+baselines in this project are my own.
+\textbf{Agents.} Ferreira et al.~\cite{ferreira} found that, in a fixed search space and under the
+same budget, CMA-ES and TPE consistently outperformed LLM agents [p.~1], and that the best method
+used the LLM only as an occasional informed perturbation [pp.~5, 8]. In a sequential setting, where
+an agent reads the training logs and intervenes [p.~7], Huai et al.~\cite{huai} found the strongest
+agent above conventional optimizers [p.~8], although agents still struggled with complex log
+diagnosis [p.~1]. Osaro et al.~\cite{osaro} let agents edit the training code of an interatomic
+potential and judged each change against a physically constrained scorecard [p.~1], which rejected
+a change that lowered the error but broke an energy-drift limit [p.~3]; the PD check plays that
+role here. Together, these studies suggest that an agent helps most when the decision draws on
+information an optimizer does not see, and none of them applies such an agent to a GNN surrogate
+for lattice stiffness.
 
 \section*{B \quad Why an agent}
 
 \subsection*{B1 \quad Why not a fixed script, an optimizer, or a single prompt}
-The agent's goal is to make the surrogate reliable on unseen families of lattice structures. It
-does so by diagnosing why the surrogate fails on those families and choosing the next step, which
-is to (a) retune with new search ranges, (b) change the model's structure with one option from a
-fixed menu, keeping earlier changes, or (c) escalate to me. The menu lists the structural changes the code supports, but
-the agent decides which failure each one should address and when to apply it. When the evidence
-points to a structural change that is not on the menu, the agent proposes it by escalating to me.
-The agent is therefore not meant to speed up the hyperparameter search. That remains the job of
-the optimizer (Optuna), a tool that both the agent and the baseline use (Fig.~\ref{fig:design}).
-
+The agent's goal is to make the surrogate reliable on unseen lattice families. It diagnoses why the
+surrogate fails on those families and chooses the next step: (a) retune with new search ranges,
+(b) change the model's structure with one option from a fixed menu, keeping earlier changes, or
+(c) escalate to me, which is also how it proposes a structural change that is not on the menu. The
+menu lists the changes the code supports, but the agent decides which failure each one should
+address and when. Speeding up the search remains the job of the optimizer (Optuna), a tool that
+both the agent and the baseline use (Fig.~\ref{fig:design}).
 \textbf{Why not the optimizer alone.} Optuna adjusts numbers within a fixed structure and treats
-the menu options as unordered categories. It cannot read a failure pattern, such as non-PD
-predictions in a few families that persist after retuning, and select the option that targets it.
-\textbf{Why not a fixed script.} A script could encode simple if-then rules, for example adding
-the PD output layer whenever predictions are not positive definite. Such rules work when one
-symptom has one cause. The failures this project targets are harder to read, because the same
-symptom can have several causes. A large error on one family may come from a poor learning-rate
-range, a missing structural feature or corrupted labels, and each calls for a different step.
-Telling these apart requires weighing the per-family errors, the optimizer history and the
-outcomes of earlier decisions together, which a fixed rule cannot anticipate. If simple rules turn
-out to be enough, the agent will not beat the baseline, and that is the negative outcome.
+the menu options as unordered categories. It therefore cannot read a failure pattern, such as
+non-PD predictions in a few families that persist after retuning, and pick the option that targets
+it. \textbf{Why not a fixed script.} If-then rules work when one symptom has one cause, but here the
+same symptom can have several. A large error on one family may come from a poor learning-rate
+range, a missing structural feature or corrupted labels, and telling these apart requires weighing
+the per-family errors, the optimizer history and earlier decisions together.
 \textbf{Why not a single prompt.} The decision depends on training runs that do not exist yet, so
 the agent needs tools, memory across rounds and a stopping rule.
 
 \section*{C \quad Agent design}
 
 \subsection*{C1 \quad Agents, tools, data and information flow}
-Figure~\ref{fig:design} shows the research loop, the baseline it is compared with, and the
-literature agent that supports the project from outside the loop.
+Figure~\ref{fig:design} shows the research loop, the baseline and the literature agent.
 \begin{figure}[!tb]\centering
-\includegraphics[width=0.94\linewidth]{figures/agent_design.pdf}
-\caption{The research loop contains a single LLM decision. In each round the optimizer launches
-five training runs, the evaluation tool writes \texttt{eval.json}, and the target check decides in
-code whether to stop. If the loop continues, the diagnostician returns a schema-checked decision,
-which the validator checks before it is applied. I approve every structural change and answer
-escalations. Each study has a budget of 20 training runs. The baseline runs Optuna alone over the
-same hyperparameters and structural menu. Outside the loop, a retrieval agent over my own paper
-corpus supports the related work, and I verify each of its page citations by hand. Drawn by a
-script written with Claude Code.}\label{fig:design}
+\includegraphics[width=0.78\linewidth]{figures/agent_design.pdf}
+\caption{The research loop contains a single LLM decision. Each round, the optimizer launches five
+training runs, the evaluation tool writes \texttt{eval.json} and code decides whether to stop;
+otherwise the diagnostician's decision is validated and applied. I approve structural changes and
+answer escalations. The baseline runs Optuna alone over the same hyperparameters and menu. Drawn
+by a script written with Claude Code.}\label{fig:design}
 \end{figure}
 
 \subsection*{C2 \quad Why each part is needed}
-\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3.0cm} Y@{}}
-\toprule
-Part & What stops working if it is removed \\
-\midrule
-Train (tool) & Without training runs, the agent has nothing to diagnose and its choices have no
-  effect. \\
-Evaluate (tool) & With only a single loss, the agent could not tell which families fail or why,
-  and no LLM-free verdict would remain. \\
-Optimizer (tool) & The agent would have to propose parameter sets itself, doing an optimizer's job
-  worse and at higher cost, and the baseline would not exist. \\
-Target check (code) & Stopping would be left to the agent, which could stop early or overspend. \\
-Validator (code) & Off-menu, already-failed or over-budget choices would run unchecked, giving
-  the agent options the baseline lacks. \\
-Diagnostician (LLM) & The loop reduces to the optimizer alone, which is exactly the ablation the
-  project measures. \\
-Human gate & Structural changes, off-menu proposals and the one-time unlock of the test set would
-  go unreviewed. \\
-Literature agent & Nothing in the experiment breaks; I would have to find and check the related
-  papers myself. \\
-\bottomrule
-\end{tabularx}
+What stops working if each part is removed:
+\begin{itemize}
+\item \textbf{Train (tool):} the agent has nothing to diagnose, and its choices have no effect.
+\item \textbf{Evaluate (tool):} the agent cannot tell which families fail, and no LLM-free verdict
+  remains.
+\item \textbf{Optimizer (tool):} the agent would tune parameters itself, worse and at higher cost.
+\item \textbf{Target check (code):} the agent could stop early or overspend.
+\item \textbf{Validator (code):} off-menu or over-budget choices would run, giving the agent options
+  the baseline lacks.
+\item \textbf{Diagnostician (LLM):} the loop reduces to the optimizer alone, the ablation measured.
+\item \textbf{Human gate:} structural changes and the test-set unlock go unreviewed.
+\item \textbf{Literature agent:} the experiment runs, but I find and check related papers myself.
+\end{itemize}
 
-The diagnostician is \texttt{claude-sonnet-5-5}, called through \texttt{claude -p} with a JSON
-output schema and no tools of its own, so code runs every tool. The state of a study is stored as
-JSON files in \texttt{runs/<study>/}. The agent remembers earlier rounds only through its decision
-log (\texttt{decisions.jsonl}), and each call is otherwise stateless, so any round can be replayed.
+The diagnostician (\texttt{claude-sonnet-5-5} via \texttt{claude -p}) returns JSON and has no tools
+of its own, so code runs every tool; it remembers earlier rounds only through its decision log.
 
 \subsection*{C3 \quad Current working module}
-The deterministic half of the loop and the optimizer baseline already run end to end, and eleven
-unit tests cover them (\texttt{python -m pytest tests}). The locked split groups the catalog into
-456 families by crystal system and average connectivity $Z$. Families with more than 200 lattices
-always go to training, and the validation and test sets are filled within each crystal system,
-which gives 13,295, 2,039 and 1,928 lattices in 325, 67 and 64 families. The training tool,
-\texttt{train(config)}, is seeded and writes each run to its own folder together with its
-configuration, git commit, split, model and loss history. The evaluation tool reports the errors
-per target and per family along with the PD check, and the optimizer runs an Optuna study over
-\texttt{config/loop.yaml}, with \texttt{check\_target} deciding in code when to stop.
+The deterministic half of the loop and the optimizer baseline run end to end, covered by eleven
+unit tests. The locked split groups the catalog into 456 families by crystal system and average
+connectivity $Z$. Families with more than 200 lattices always go to training, and the rest are
+split within each crystal system into 13,295, 2,039 and 1,928 lattices in 325, 67 and 64 families.
+Trained for 100 epochs on the full training split, the default model (four message-passing layers
+of width 128) took about 1.5\,h on a laptop CPU (\texttt{runs/main-full}, Fig.~\ref{fig:runs}a).
+Its validation loss, still falling at the end, reached 0.112 at epoch 97. On 2,032 validation lattices in 67 families, $R^2$ is 0.89--0.93 for the
+moduli and 0.83--0.85 for the couplings, with median errors of 25--39\% and 0.041--0.048. However,
+194 of these predictions (9.5\%) are not positive definite, whereas every FE stiffness in the
+catalog is, so the violations come from the model and are the failure the planned PD output layer
+targets. On a 2,000-lattice subset (\texttt{runs/main-2000}), the same model reached a validation
+loss of 0.223, median modulus errors of 54--62\% and 7.9\% non-PD predictions on 239 validation
+lattices. About eight times more data thus roughly halved the error, but it did not reduce the
+share of invalid predictions.
 
-To show that the training and evaluation tools work on real data, I trained the default model
-(four message-passing layers of width 128, learning rate $10^{-3}$) for 100 epochs on the full
-training split, which took about 1.5\,h on a laptop CPU (\texttt{runs/main-full}). Both losses
-fall steadily, and the scheduler halves the learning rate once (Fig.~\ref{fig:loss}). The
-validation loss reaches its lowest value of 0.112 at epoch 97 and was still falling when the
-100-epoch limit ended the run, while the training loss falls to 0.063. On the 2,032 validation
-lattices in 67 families, $R^2$ is 0.89--0.93 for the moduli and 0.83--0.85 for the couplings, and
-the median errors are 25--39\% for the moduli and 0.041--0.048 for the couplings
-(Fig.~\ref{fig:targets}). For 194 of the 2,032 validation lattices (9.5\%), the predicted stiffness
-matrix is not positive definite and is therefore physically invalid, whereas the FE stiffness in
-the catalog is positive definite for all of them. These violations come from the model rather than
-the data, and they are the failure the planned PD output layer is designed to remove. The same
-model trained for 10 minutes on a 2,000-lattice subset (12\% of the data, \texttt{runs/main-2000})
-reached a validation loss of 0.223, median modulus errors of 54--62\% and 7.9\% non-PD predictions
-on its 239 validation lattices. Although the two validation sets differ in size, eight times more
-data roughly halved the error but left the share of invalid predictions no lower.
-
-To test the optimizer baseline, I ran one Optuna study on the 2,000-lattice subset
-(\texttt{runs/optuna-2000}) over the learning rate, weight decay, width, depth, batch size and the
-augmentation switch, with a patience of 20 epochs. The study stopped after 13 of its 20 runs,
-about 2\,h, because ten runs in a row brought no improvement (Fig.~\ref{fig:study}). Its best run
-(six layers of width 128, batch size 32, learning rate $4.8\times10^{-4}$) reached a validation
-loss of 0.224, essentially equal to the untuned \texttt{main-2000} run, with a median modulus
-error of 55\% and 10\% non-PD predictions. One run returned no non-PD predictions at all, but its
-median modulus error was 334\%, so a low non-PD rate is only meaningful together with the error.
-On this subset, tuning the hyperparameters alone therefore did not lower the held-out error, which
-is the situation in which diagnosing the failure could add something. This is a single study with
-one seed, however, and the repeats in Section~D are needed before drawing that conclusion. The
-evaluation reports of these runs are exactly the input the diagnostician will read.
+One Optuna study on the same subset (\texttt{runs/optuna-2000}), over the learning rate, weight
+decay, width, depth, batch size and augmentation, stopped after 13 of its 20 runs (about 2\,h)
+because ten runs in a row brought no improvement (Fig.~\ref{fig:runs}b). Its best run reached a
+validation loss of 0.224, no better than the untuned run, with 10\% non-PD predictions. One run had
+no non-PD predictions but a median modulus error of 334\%, so the non-PD rate only means something
+together with the error. Tuning alone therefore did not lower the held-out error on the subset,
+which is where a diagnosis could add something, although a single study with one seed cannot
+settle this.
 
 \begin{figure}[!tb]\centering
-\includegraphics[width=0.62\linewidth]{figures/mainfull_loss.png}
-\caption{Training and validation loss (standardized MSE, log scale; 1.0 equals predicting the
-training mean) and learning rate for \texttt{runs/main-full}. Plotted by
-\texttt{lattice\_gnn/report.py}.}\label{fig:loss}
+\begin{minipage}[b]{0.50\linewidth}\centering
+\includegraphics[height=4.0cm]{figures/mainfull_loss.png}\\[-0.5ex]{\small (a)}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.48\linewidth}\centering
+\includegraphics[height=3.8cm]{figures/optuna-2000_trials.pdf}\\[-0.5ex]{\small (b)}
+\end{minipage}
+\caption{(a) Loss (standardized MSE; 1.0 equals predicting the training mean) and learning rate
+for \texttt{main-full}. (b) Validation loss of each run in the study \texttt{optuna-2000}, the best
+so far, and the untuned \texttt{main-2000} run on the same data.}\label{fig:runs}
 \end{figure}
 
-\begin{figure}[!tb]\centering
-\includegraphics[width=\linewidth]{figures/mainfull_targets.png}
-\caption{Validation $R^2$ and median errors per target for \texttt{runs/main-full} (2,032
-lattices, 67 families): relative errors for the moduli, absolute errors for the Poisson
-couplings.}\label{fig:targets}
-\end{figure}
+\textbf{Module demo: the literature agent (Labs 4 and 5).} The literature agent lives in a separate
+private repository, \texttt{capstone-agent}, which holds its instructions, memory, skills and
+permissions. In Lab 4, I wrote its permissions as a specification
+(\texttt{PERMISSIONS.md}) and enforced them through \texttt{.claude/settings.json}, which pins
+\texttt{claude-opus-5-5}, allows only the course skills and pushes to \texttt{claude/} branches,
+and denies merges, web tools, corpus edits and bypass mode. A weekday cloud routine that can reach
+only \texttt{export.arxiv.org} writes an arXiv digest and opens a pull request that only I can
+merge; on 29 October it found three new metamaterial papers. In Lab 5, I added retrieval over ten
+papers on which this project rests, each pinned by edition, among them the catalog~\cite{lumpe} and
+the PD output layers of Jekel et al.~\cite{jekel}. The index holds 376 chunks, each confined to one
+page so that it carries its page number, and the agent may run only \texttt{retrieve.py} and
+\texttt{check\_citations.py}, which confirms that every quote appears in the chunk it cites. In the
+demo (\texttt{eval/transcript\_C.jsonl}), one \texttt{claude -p} call asked how Jekel et al. keep
+the predicted stiffness positive definite. The agent passed the citation check for all three of
+its quotes and answered that a Cholesky or
+eigendecomposition output layer guarantees a PD output without adding learnable parameters
+(\S6, p.~14), in 26\,s for US\$0.16. This is the source behind the \texttt{pd\_head} menu option.
 
-\begin{figure}[!tb]\centering
-\includegraphics[width=0.6\linewidth]{figures/optuna-2000_trials.pdf}
-\caption{Validation loss of each training run in the Optuna study \texttt{runs/optuna-2000}
-(2,000-lattice subset, 239 validation lattices), the best value so far, and the untuned
-\texttt{main-2000} run on the same data. Plotted by \texttt{scripts/make\_study\_figure.py}.}
-\label{fig:study}
-\end{figure}
-
-
-The only agent to call tools so far is an earlier literature agent (22 domain and 34 agent
-papers), which the retrieval agent in Fig.~\ref{fig:design}, built in Labs 4 and 5, will replace.
+On 25 questions written before any chunk existed, 19 of them answerable from the corpus, hit@5
+(the share of answerable questions for which one of the five returned passages contains the
+answer) was only 0.26--0.37 across embedding, hybrid and keyword search. The misses
+share a cause: author names appear only in page headers and reference lists, so questions that name
+a paper retrieve its bibliography, and paraphrases that span several papers match no single chunk.
+The agent did, however, decline all six questions whose answer is not in the corpus. The retriever
+is therefore usable with the citation check and a hand check of each page citation, but not yet
+reliable enough to rebuild A2 on its own.
 
 \section*{D \quad Evaluation}
 
 \subsection*{D1 \quad LLM-free check and success}
-\textbf{Physical validity.} For every prediction, code assembles the $6\times6$ stiffness matrix
-and checks that it is positive definite, so that any strain stores positive energy. Because the
-predicted moduli are positive by construction, this reduces to checking that the smallest
-eigenvalue of a $3\times3$ matrix built from the three Poisson couplings is positive. The threshold
-for ``positive'' is $3.6\times10^{-7}$, the largest shift that single-precision rounding can cause,
-so the check never accepts or rejects a prediction because of rounding alone.
-
-\textbf{Success.} Success is defined by comparison with the baseline rather than by an absolute
-target. The agent succeeds if, at the same 20-run budget, its final model has a lower error on the
-64 locked test families than the baseline's, by more than the spread across three repeats. The
-test families are used only once, at the end. I also report the non-PD rate and the number of
-training runs needed to reach the target defined below. Each escalation counts as not solved, so the agent
-cannot improve its score by declining to decide. To test the diagnosis itself, I plant three
-failures with known causes: removing the PD output layer, restricting the learning-rate range to
-exclude good values, and corrupting the labels of one family. For each, I record whether the
-agent names the correct remedy.
-
-\textbf{Thresholds.} The only threshold fixed by the physics is the non-PD rate, whose target is
-zero because any non-PD prediction is physically invalid. No downstream specification fixes an
-acceptable error for the moduli, so I do not set an accuracy target by eye. Instead, the target for
-counting runs comes from the experiment itself: it is the best validation error the baseline
-reaches within its budget, and I count how many runs the agent needs to match it. Studies therefore
-stop when the budget is used or progress stalls, not when an accuracy target is met. The precision
-of the catalog labels, which give the moduli to three significant figures and the couplings to
-three decimals, sets a floor on the achievable error rather than a target.
-
-\textbf{Checking each decision.} Every decision is also checked in code after it runs. The next
-round's evaluation shows whether the error of the targeted families and the non-PD rate dropped,
-and, for a structural change, whether the effect the agent predicted actually occurred; both
-results go into the decision log. Because the error also varies by chance, a drop counts only if it
-exceeds the spread between repeated runs with different seeds. The planted failures then test
-whether the diagnosis itself is correct, not only whether the error fell. Separately, I will
-validate selected predictions of the surrogate by hand with Abaqus FE simulations, which checks the
-model and the catalog labels rather than the agent's decisions.
-
-\textbf{Agent variability.} I pin the model ID (\texttt{claude-sonnet-5-5}) and the effort level
-of \texttt{claude -p}, but its temperature cannot be set, so the same input can still lead to
-different decisions. Training and Optuna are therefore seeded, so that the remaining variation
-comes from the agent, and I measure decision consistency by asking the agent to decide on the same
-frozen reports about ten times each.
+\textbf{Physical validity.} Code assembles the $6\times6$ stiffness matrix of every prediction and
+checks that it is positive definite, so that any strain stores positive energy. Because the
+predicted moduli are positive by construction, this reduces to checking the smallest eigenvalue of
+a $3\times3$ matrix built from the Poisson couplings. Its threshold, $3.6\times10^{-7}$, is the
+largest shift that single-precision rounding can cause.
+\textbf{Success.} The agent succeeds if, at the same 20-run budget, its final model has a lower
+error on the 64 locked test families than the baseline's, by more than the spread across three
+repeats. The test families are used once, at the end. I also report the non-PD rate and the runs
+needed to reach the target defined below, and each escalation counts as not solved, so declining
+cannot raise the score. To test the diagnosis itself, I plant three failures with known causes
+(no PD output layer, a learning-rate range that excludes good values, and corrupted labels in one
+family) and record whether the agent names the correct remedy.
+\textbf{Thresholds.} The non-PD target is zero, because any non-PD prediction is physically
+invalid. No specification fixes an acceptable error for the moduli, so I set no accuracy target by
+eye. Instead, the target for counting runs is the best validation error the baseline reaches, and
+studies stop when the budget is used or progress stalls. The precision of the catalog labels
+(three significant figures for the moduli, three decimals for the couplings) is a floor on the
+error, not a target.
+\textbf{Checking each decision.} After each decision, code checks whether the next round lowered
+the error of the targeted families and the non-PD rate, and whether a structural change had the
+effect the agent predicted, and it logs both. Because the error also varies by chance, a drop
+counts only if it exceeds the spread between runs with different seeds. Separately, I will validate
+selected predictions of the surrogate by hand with Abaqus FE simulations, which checks the model
+and the labels rather than the agent's decisions.
+\textbf{Agent variability.} I pin the model ID and effort level, but \texttt{claude -p} cannot
+set the temperature, so I seed training and Optuna and repeat each decision on the same frozen
+reports about ten times.
 
 \subsection*{D2 \quad Baseline}
-The baseline is Optuna alone, with the same tools, the same 20-run budget, the same locked test
-families and the same three repeats. It searches the hyperparameters and the structural menu
-together, treating each menu option as an on/off setting. Every trial therefore sets all switches
-at once, so the baseline can try combinations of structural changes from the start, whereas the
-agent adds one change per decision and keeps it. Because the baseline can reach every menu option
-the agent can, any advantage of the agent must come from its diagnosis, for example reaching a
-good model in fewer runs. Structural changes outside the menu, which the agent can only propose by
-escalating to me, are not available to the baseline. Any result that depends on one is therefore
-reported separately rather than counted as an agent success.
+The baseline is Optuna alone, with the same tools, 20-run budget, locked test families and three
+repeats. It treats each menu option as an on/off setting, so it can try combinations of structural
+changes from the start, whereas the agent adds one change per decision and keeps it. Because the
+baseline can reach every menu option the agent can, any advantage of the agent must come from its
+diagnosis, for example reaching a good model in fewer runs. Results that depend on an off-menu
+change, which only the agent can propose by escalating to me, are reported separately.
 
 \section*{E \quad Plan and risks}
 
@@ -286,50 +240,39 @@ reported separately rather than counted as an agent success.
 test); \texttt{validate.py} with a unit test per rule; the diagnostician making one validated
 decision on the \texttt{main-full} report, with tokens and cost logged.
 \textbf{By Lab Report 4 (Nov 29):} the loop with the human gate; \texttt{family\_balanced\_loss}
-(then \texttt{physics\_residual} if time allows); agent and baseline studies on the full catalog,
-3 repeats each, about 180\,h of CPU at about 1.5\,h per run, plus about 90\,h for the three
-planted failures; one evaluation on the locked test families.
+(then \texttt{physics\_residual}); agent and baseline studies on the full catalog, 3 repeats each
+(about 180\,h at 1.5\,h per run), and the planted failures (about 90\,h); one evaluation on the
+locked test families.
 
 \subsection*{E2 \quad Biggest risk and question for the TAs}
-Compute is the biggest risk. A single training run on the full catalog takes about 1.5\,h on my
-laptop CPU, so the agent and baseline studies and the planted failures together need about 270\,h,
-which is roughly 11 days of continuous computing within the 14 days between Lab Reports 3 and 4.
-The loop must therefore be working early in that window, and even then 3 repeats per condition
-may be too few to separate the agent from the baseline. \emph{Question:} is 3 repeats of a
-20-run study enough for this comparison, or should the budget be split differently?
+Compute is the biggest risk: the studies and planted failures need about 270\,h of laptop CPU,
+roughly 11 of the 14 days between Lab Reports 3 and 4, and even then 3 repeats per condition may
+be too few to separate the agent from the baseline. \emph{Question:} is 3 repeats of a 20-run study enough for this
+comparison, or should the budget be split differently?
 
 \section*{Progress log}
 \textbf{Done since Lab Report 1} (\texttt{LOG.md}, 29--31 Oct): the catalog's $Z_\text{avg}$
-convention reproduced (257 of 17,262 records, 1.5\%, still differ); a family-grouping bug fixed
-(456 families, not one per RCSR name); the locked split frozen; \texttt{train},
-\texttt{evaluate}, \texttt{optimize} and \texttt{check\_target} built and tested; the first real
-training runs, including one on the full catalog; a first Optuna study on the 2,000-lattice
-subset; a report skill that tabulates a run without interpreting it.
+convention reproduced (257 of 17,262 records still differ); a family-grouping bug fixed; the
+locked split frozen; the four loop tools built and tested; the first real training runs and Optuna
+study; the success criteria fixed; Labs 4 and 5 built into the literature agent.
 \textbf{Remaining:} the menu switches, the validator, the agent, the loop and the evaluation
-harness; fixing the success thresholds; explaining the 257 $Z_\text{avg}$ mismatches and the 4
-non-PD labels; reading the dataset's supplementary information. \textbf{Bottleneck:} CPU time for
-the full-catalog studies (E2). \textbf{Maintenance:} the repository has 22 commits since 9 October,
-and \texttt{LOG.md} has dated entries for 18, 29, 30 and 31 October with done / remaining / bottlenecks;
-\texttt{docs/TODO.md} tracks the build order.
+harness; explaining the 257 $Z_\text{avg}$ mismatches and the 4 non-PD labels.
+\textbf{Bottleneck:} CPU time for the full-catalog studies (E2). \textbf{Maintenance:} 22 commits
+since 9 October and dated \texttt{LOG.md} entries for 18 and 29--31 October.
 
 \section*{AI usage disclosure}
-\textbf{Claude Code} (\texttt{claude-opus-5-5}; Claude Code 2.1.307 at the time of writing) was the builder: it
-wrote the code in \texttt{lattice\_gnn/}, the tests, the scripts and the figure script under my
-direction (20 of 22 commits carry its co-author line), and drafted this report from
-\texttt{LOG.md} and my design worksheet. I made the design decisions recorded in
-\texttt{docs/agent\_design\_worksheet.md} and directed and reviewed each step; every number in this
-report comes from a logged run (\texttt{LOG.md} and the \texttt{eval.json} files of
-\texttt{runs/main-2000}, \texttt{main-full} and \texttt{optuna-2000}) or the
-literature review. \textbf{An earlier literature agent} (\texttt{claude-sonnet-5-5}; Claude Code 2.1.299 and
-2.1.307) found and recorded papers in two runs (\texttt{literature\_review/}); the retrieval agent in
-Fig.~\ref{fig:design} was not yet used. \textbf{References:} all references below were suggested
-by the literature agent; I have not yet read
-\cite{ferreira}, \cite{huai} and~\cite{osaro} myself. The cited page numbers
-of~\cite{indurkar} and~\cite{grega} were checked against the PDFs before Lab Report 1 (10 of 11
-held; the one paraphrase is not used). The claims from~\cite{lumpe} were read through the Europe PMC text,
-which has no page numbers.
+\textbf{Tools.} Claude Code (\texttt{claude-opus-5-5}, version 2.1.307) built this project under my
+direction: it wrote the code, tests and figure scripts (20 of 22 commits carry its co-author line)
+and drafted this report from \texttt{LOG.md} and my design worksheet. An earlier literature agent
+(\texttt{claude-sonnet-5-5}) searched for related papers in two runs (\texttt{literature\_review/}).
+For Labs 4 and 5, Claude Code drafted the permissions, the index change, the evaluation runs and
+the notes in \texttt{capstone-agent}, and I approved each commit. \textbf{My role and checks.} I
+made the design decisions, wrote the 25 retrieval questions, and reviewed each step and each
+commit. Every number in this report comes from a logged run (\texttt{runs/} or
+\texttt{capstone-agent/eval/}) or a cited paper. I read every cited paper and checked each cited page
+against its PDF.
 
-\begin{thebibliography}{3}\small
+\begin{thebibliography}{3}\footnotesize\setlength{\itemsep}{0pt}
 \bibitem{lumpe} T.~S. Lumpe, T.~Stankovi\'c. Exploring the property space of periodic cellular
   structures based on crystal networks. \emph{PNAS} 118(7), 2021. doi:10.1073/pnas.2003504118.
 \bibitem{indurkar} P.~P. Indurkar, S.~Karlapati, A.~J.~D. Shaikeea, V.~S. Deshpande. Predicting
@@ -344,6 +287,9 @@ which has no page numbers.
   agents as sequential hyperparameter optimizers. arXiv:2607.29626, 2026.
 \bibitem{osaro} E.~Osaro, S.~Adhikari, S.~Zavitsanou, K.~Parker, D.~Rocca. MLIPilot: LLM-driven
   auto-research for machine-learned interatomic potentials. arXiv:2605.30889v1, 2026.
+\bibitem{jekel} C.~F. Jekel, K.~E. Swartz, D.~A. White, D.~A. Tortorelli, S.~E. Watts. Neural
+network layers for prediction of positive definite elastic stiffness tensors. arXiv:2203.13938v1,
+2022.
 \end{thebibliography}
 
 \end{document}

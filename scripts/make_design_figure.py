@@ -148,7 +148,7 @@ def main():
     # The literature (retrieval) agent from Labs 4/5, with its own human check.
     lit_w, check_x = 4.6, 5.55
     box(ax, LX, -2.3, lit_w, 1.65, {**LLM, "ls": (0, (4, 3))}, "Literature agent (support)",
-        "retrieval over my own paper corpus;\nreturns claims with page citations", "in progress")
+        "retrieval over my own paper corpus;\nreturns claims with page citations", "built")
     box(ax, check_x, -2.3, CX + CW - check_x, 1.65, HUMAN, "Human check",
         "verifies each page\ncitation by hand")
     arrow(ax, (LX + lit_w, -1.475), (check_x, -1.475), "claims",

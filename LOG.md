@@ -1,5 +1,49 @@
 # Running log
 
+## 2026-11-01
+
+**Done**
+- Decisions (Jamie), recorded in `docs/agent_design_worksheet.md` and `config/loop.yaml`:
+  - Agent and baseline studies train on the full catalog, on the laptop CPU (~1.5 h per run;
+    ~270 h for 3 repeats x 2 conditions x 20 runs plus the planted failures).
+  - Thresholds: non-PD target 0; no accuracy target from a spec, so the accuracy thresholds are 0
+    and studies stop on budget or no progress. Runs-to-target uses the baseline's best validation
+    error.
+  - Each decision is checked in code afterwards (targeted families' error and non-PD rate; a drop
+    counts only beyond seed-to-seed spread). Model ID and `--effort` pinned (level still to choose).
+- Lab Report 2 drafted and trimmed to 5 pages (`reports/lab_report_2.tex`). Module demo: the
+  Labs 4 and 5 literature agent in `capstone-agent` (permissions, arXiv routine, retriever;
+  hit@5 0.26-0.37, 6/6 abstentions on out-of-corpus questions).
+- Jamie read every cited paper and checked each cited page.
+
+**Remaining**
+- Optuna citation; rebuild A2 with the retriever.
+- `pd_head`, the validator and the diagnostician (Lab Report 3).
+- Choose the `--effort` level.
+
+**Bottlenecks**
+- CPU time: the full-catalog studies need ~11 of the 14 days between Lab Reports 3 and 4.
+
+## 2026-10-31
+
+**Done**
+- Overnight runs on the laptop CPU (19:53-23:23):
+  - `runs/optuna-2000`: Optuna study on the 2,000-lattice subset, patience 20. Stopped after 13
+    of 20 runs (no new best in 10). Best: trial 2 (6 layers, width 128, batch 32, lr 4.8e-4),
+    validation loss 0.224 vs 0.223 for the untuned `main-2000`; 10% non-PD. Trial 6: 0% non-PD
+    but 334% median modulus error.
+  - `runs/main-full`: default model on the full training split, 100 epochs, patience 40, ~1.5 h.
+    Best epoch 97 (validation loss 0.112, still falling); 2,032 validation lattices in 67
+    families; R² 0.89-0.93 (moduli), 0.83-0.85 (couplings); median errors 25-39% and
+    0.041-0.048; 194 non-PD predictions (9.5%), 0 non-PD labels.
+- `scripts/make_study_figure.py` plots a study's trials.
+
+**Remaining**
+- Decide which data the agent and baseline studies use (decided 2026-11-01: full catalog).
+
+**Bottlenecks**
+- A full-catalog run takes ~1.5 h on the CPU, against ~10 min on the subset.
+
 ## 2026-10-30
 
 **Done**
