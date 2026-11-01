@@ -43,7 +43,8 @@ Data split (three groups):
   1. Training lattices: the GNN learns from these.
   2. Validation families: held out from training; agent and optimizer may look at them.
   3. Test families: locked; used once at the end to compare agent and baseline.
-  OPEN: what counts as a "family" (same crystal net? similar connectivity?).
+  Family = crystal system + Z (456 families), resolved 2026-10-30; locked split
+  splits/main.json (see LOG.md).
 ```
 
 ---
@@ -119,12 +120,21 @@ Options (enumerated, so they can be logged and counted):
       edits), the failure it targets, and a prediction of what should improve.
   (c) escalate: see below.
   "Get more data" is dropped: the catalog is fixed and test families must stay untouched.
-  OPEN: the contents of the structural menu (about 4-6 options).
+  Jamie, 2026-10-30: "The fixed menu will provide possible structure changes, but the agent will
+  be the one diagnosing and choosing the structural change or it can suggest a structural change
+  not mentioned in the fixed menu by escalating to me. The optimizer will remain a tool that both
+  the baseline and the agent uses."
+  One menu option per decision; structural changes accumulate across rounds (Jamie, 2026-10-30).
+  The baseline sets every menu switch per trial, so it can reach combinations from the start.
+  Results that depend on an off-menu change approved after escalation are reported separately.
+  Structural menu (2026-10-30): augment (built); pd_head by LR3; family_balanced_loss,
+  then physics_residual if time allows, by LR4.
 
-Stopping (checked by code, not the agent; values in <> are placeholders):
-  - success: every validation family below <target error> and non-PD rate <= <threshold>
-  - budget: <40> training runs used
-  - no progress: <2> rounds in a row without improving by more than <X>
+Stopping (checked by code, not the agent; decided 2026-11-01):
+  - success: no accuracy target from a spec, so accuracy thresholds are 0 (never met);
+    non-PD target is 0
+  - budget: 20 training runs used
+  - no progress: 10 runs in a row without a new best (config/loop.yaml)
   - cap of <3> structural changes
 
 Escalation:
@@ -144,7 +154,8 @@ Checks on the agent's choice:
   2. Before it runs (human): structural changes need approval.
   3. After it runs (code): next round's evaluation shows whether the targeted family's error
      and the non-PD rate dropped, and whether the (b) prediction came true; result goes into
-     the decision log.
+     the decision log. A drop counts only if it exceeds the spread between repeated runs
+     with different seeds.
   4. End of project: planted failures with known causes, scored on whether the agent names
      the correct remedy, e.g.
        - PSD output layer removed -> change structure, add PSD layer
@@ -158,10 +169,12 @@ Why a fixed rule cannot make it:
 
 Stochasticity:
   The agent's choice can vary between runs even with a fixed menu. Seed training and Optuna so
-  remaining variation comes mainly from the agent; repeat each condition ~5 times and report
+  remaining variation comes mainly from the agent; repeat each condition 3 times and report
   spread; measure decision consistency by asking the agent to decide on frozen evaluation
   reports ~10 times each and counting the outcomes.
-  OPEN: Claude Code may not allow setting temperature; settle in Section 10.
+  Temperature: `claude -p` has no temperature setting (checked on Claude Code 2.1.307), so it
+  stays at the CLI default; consistency is measured by the repeated calls above. The model
+  ID and the --effort level are pinned (2026-11-01; effort level still to choose).
 ```
 
 ---
@@ -174,9 +187,14 @@ Stochasticity:
 
 | Role | LLM or code | Model ID (pinned) | Reads (state/memory) | Writes | Can call tools |
 |------|-------------|-------------------|----------------------|--------|----------------|
-|      |             |                   |                      |        |                |
-|      |             |                   |                      |        |                |
-| Human | —          | —                 |                      |        |                |
+| Diagnostician | LLM, `claude -p --model <id> --json-schema <schema>` | `claude-sonnet-5-5` | `eval.json`, `trials.json`, `decisions.jsonl`, current menu state, remaining budget | one decision as JSON | none (returns JSON; code runs the tools) |
+| Orchestrator | plain Python | — | `config/loop.yaml`, all run files | appends `decisions.jsonl`, `run_info.json` | all tools in section 5 |
+| Human | —          | —                 | escalations, proposed structural changes | approve / change spec / stop | — |
+
+Answers (accepted 2026-10-30):
+- State lives in JSON files under `runs/<study>/`, so every round can be inspected and replayed.
+- Memory between rounds: the decision log with outcomes. Reset each round: the conversation;
+  each call is stateless and gets its full input from files.
 
 Questions to settle:
 - Where does state live (LangGraph state object, JSON files in the repo, a run database)?
@@ -206,6 +224,20 @@ Starting point from the current repo (check the status column yourself):
 **Answer** (final list, with the schema for each tool the agent calls):
 
 ```
+Exist (lattice_gnn/):
+  make_splits              -> frozen splits/main.json                         splits.py
+  train(config)            -> run_id; writes runs/<id>/                       training.py
+  evaluate(run_id, part)   -> eval.json (per target, per family, PD check)   evaluate.py
+  optimize(loop, study)    -> {check, best}; writes trials.json               optimize.py
+  check_target(eval, thresholds, used, budget, since_best)
+                           -> continue | stop(reason)                         optimize.py
+  report(run)              -> tables and plots, no interpretation             report.py
+Planned:
+  validate(decision, state) -> ok | error                                    validate.py (TODO 9)
+  apply(decision)           -> new loop config                               orchestrator (TODO 10)
+Dropped this term: fe_solve (defects out of scope, section 11).
+Agent output schema: decision (retune | change_structure | escalate), reason, evidence,
+  plus ranges (retune) or menu_option + prediction (change_structure).
 ```
 
 ---
@@ -222,8 +254,8 @@ Setup (once, human): freeze the three groups, set the budget (e.g. 40 training r
 thresholds from the math.
 
 Each round:
-1. Optimizer (tool): Optuna runs ~10 training runs on the fixed structure -> best config,
-   trial history.
+1. Optimizer (tool): Optuna runs 5 training runs on the fixed structure -> best config,
+   trial history. (20-run budget, so up to 3 agent decisions per study; set 2026-10-30.)
 2. Evaluate (tool): error per validation family and per target, non-PD count.
 3. Check (code): target met / budget gone / no progress -> stop.
 4. Agent (LLM, only step): reads evaluation report, optimizer history, its past decisions ->
@@ -236,6 +268,10 @@ Baseline: no agent; Optuna searches the settings and the structural menu togethe
 same budget (see Section 8).
 
 Hand-off payloads (what exactly is passed, in what format):
+  optimizer -> evaluate: run_id
+  evaluate -> check, agent: eval.json
+  agent -> validate: decision JSON (schema in section 5)
+  validate -> human gate -> apply: approved decision
 
 Stopping conditions (all checkable by code): see Section 3.
 ```
@@ -250,9 +286,11 @@ Stopping conditions (all checkable by code): see Section 3.
 **Answer:**
 
 ```
-Approve before:
-Review after:
-Escalations the human handles:
+Approve before: every change_structure; any step beyond the run budget; unlocking the
+  test set (used once, at the end).
+Review after: each round's decision log; the final comparison.
+Escalations the human handles: no menu option fits; suspected bad labels; agent output
+  failed the schema twice; agent repeated an option that already failed.
 ```
 
 ---
@@ -271,20 +309,25 @@ LR1 already had the right test set idea: held-out lattice families rather than a
 Baseline (same tools and budget, no agent):
   Optuna searches over the hyperparameters AND the structural menu, treating each menu option
   as a categorical setting (e.g. PSD layer yes/no, edge features A/B, layers 3/4/5). Same
-  budget (<40> training runs), same locked test families, same repeats. This is the fair
+  budget (20 training runs), same locked test families, same repeats. This is the fair
   comparison: the optimizer has access to every option the agent has, so any advantage must
   come from the agent's diagnosis, e.g. reaching a good model in fewer runs.
   (Not planned: optimizer on a fixed structure, too weak; hand-written rules, optional extra
   rung if time allows.)
 
 Held-out tasks (which families / targets; frozen before development):
+  The 64 locked test families in splits/main.json (1,928 lattices), all 9 targets.
 
-Repeats per condition: ~5        Model ID:          Temperature:
+Repeats per condition: 3 (budget, section 11)   Model ID: claude-sonnet-5-5
+Temperature: CLI default, not settable in claude -p   Effort: pinned via --effort
+
+Success (primary, comparative): the agent beats the baseline on locked test error by more
+  than the spread across repeats. No absolute accuracy target (section 9).
 
 Metrics (agent vs baseline):
   - error on the locked test families at the end of the budget
   - non-PD rate
-  - number of training runs needed to reach the target
+  - number of training runs the agent needs to reach the baseline's best validation error
   - on planted failures: whether the correct remedy was picked (Section 3, check 4)
 
 How abstention / escalation is scored: an escalation counts as "not solved".
@@ -300,9 +343,10 @@ How abstention / escalation is scored: an escalation counts as "not solved".
 
 | Check | Threshold | Derived from |
 |-------|-----------|--------------|
-| Positive definiteness | smallest eigenvalue > ? | |
-| "Target met" accuracy | | |
-| Data sanity | | |
+| Non-PD rate | 0 | Any non-PD prediction is physically invalid |
+| Positive definiteness | smallest eigenvalue of the normalized 3x3 block > 3·eps32 (3.6e-7) | Sylvester + Weyl bound on float32 rounding; comment in `lattice_gnn/evaluate.py` |
+| "Target met" accuracy | none: thresholds 0 in `config/loop.yaml`, so studies stop on budget or no progress; runs-to-target uses the baseline's best validation error (2026-11-01) | No downstream spec. Only derived number is the label-precision floor: moduli printed to 3 significant figures (~0.5 %), couplings to 3 decimals (±0.0005). A floor, not a target. Primary success is comparative (section 8). |
+| Data sanity | 257 Z_avg mismatches and 4 non-PD labels listed and excluded | LOG.md 2026-10-29 |
 
 ---
 
@@ -319,6 +363,15 @@ Decide and justify; the debrief encourages the course stack:
 **Answer:**
 
 ```
+Orchestrator: plain Python, not LangGraph; the loop is linear with one branch and state
+  already lives in JSON files (section 4).
+MCP: not for the new tools; the agent calls no tools, it returns JSON and code runs the tools.
+  The literature agent keeps its MCP / CLI tools.
+Claude access: Claude Code seat, no API key; claude -p --model claude-sonnet-5-5
+  --json-schema <schema> --output-format json.
+Trace and cost: tokens and cost per call from --output-format json into run_info.json;
+  prompt and reply saved per round.
+Temperature: not settable; consistency measured by ~10 repeated calls on frozen reports.
 ```
 
 ---
@@ -331,10 +384,21 @@ Decide and justify; the debrief encourages the course stack:
 **Answer:**
 
 ```
-In scope:
-Explicitly out of scope:
+In scope: diagnostician loop; Optuna baseline over hyperparameters + menu; planted-failure
+  tests; all on the locked split.
+Explicitly out of scope: defects (candidate B, later extension), FE as an agent tool, full
+  equivariant models, data acquisition.
+FE validation (Jamie, 2026-10-30): "the Abaqus will be by hand Finite Element simulations
+  that I will perform to validate the results."
 Top risks and mitigation:
-Fallback if the agent adds nothing (negative result plan):
+  - Compute: studies run on the full catalog, on my own laptop CPU (Jamie, 2026-11-01).
+    ~1.5 h per default-size run (runs/main-full; the 2,000-lattice subset took ~10 min).
+    Budget: 3 repeats x 2 conditions x 20 runs ~ 180 h, plus 3 planted failures x 1 repeat
+    x 20 runs ~ 90 h; ~11 days of continuous computing between Lab Reports 3 and 4.
+  - Accuracy targets not derivable from a spec: success is comparative (section 8).
+Fallback if the agent adds nothing (negative result plan): the agent never picks
+  change_structure, so the optimizer matches it; report that, and switch to the operator
+  agent evaluated on planted failures (debrief).
 ```
 
 ---

@@ -1,0 +1,938 @@
+[
+  {
+    "title": "Can LLMs Beat Classical Hyperparameter Optimization Algorithms? A Study on autoresearch",
+    "authors": "Fabio Ferreira, Lucca Wobbe, Arjun Krishnakumar, Frank Hutter, Arber Zela",
+    "year": 2026,
+    "identifier": "2603.24647v5",
+    "category": "other",
+    "relevance": 5,
+    "summary": "Benchmarks 9 HPO methods (4 classical, 4 LLM-based, 1 hybrid) on Karpathy’s autoresearch task (a ~50M-parameter transformer, 14 auto-extracted hyperparameters, 24 h GPU budget, 3 seeds). Within a fixed search space classical CMA-ES, TPE and SMAC beat LLM agents; unconstrained code editing narrows but does not close the gap. A hybrid (Centaur) that shows CMA-ES internal state to an LLM on 30% of trials is best.",
+    "relevance_to_project": "Most direct evidence on whether an LLM tuning agent should replace Optuna/CMA-ES. Supports giving the lattice-GNN tuning agent a classical optimizer as the inner loop and using the LLM for occasional informed proposals and for edits outside a fixed space. Caveat: one task (language-model pretraining), not a GNN or regression surrogate.",
+    "fulltext_source": "https://arxiv.org/pdf/2603.24647v5",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2603.24647v5",
+    "methods": "TPE, CMA-ES, SMAC, random search, LLAMBO (two variants), Karpathy agent (fixed HPs and code editing), Centaur hybrid; Qwen3.5 0.8B/27B, Gemini 3.1 Pro, Claude Opus 4.6",
+    "data": "nanochat small decoder-only transformer on FineWeb; metric val_bpb; each trial 5 min on one H200",
+    "key_findings": "Fixed space: Centaur 0.9763, TPE 0.9768, SMAC 0.9778, CMA-ES 0.9785 mean best val_bpb (lower is better); several pure-LLM methods worse than random search. LLM methods show OOM rates (48%, 61%) similar to random search (56%) whereas CMA-ES 16% and TPE 11%.",
+    "evidence": [
+      {
+        "claim": "Classical HPO beats LLM agents in a fixed search space; code editing narrows but does not close the gap; hybrid is best",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "classical methods such as CMA-ES and TPE consistently outperform LLM-based agents, where avoiding out-of-memory failures matters more than search diversity. Allowing the LLM to directly edit source code narrows the gap to the classical methods but does not close it"
+      },
+      {
+        "claim": "Experimental protocol: 9 methods, 24 h budget, 3 seeds",
+        "location": "Section 1",
+        "page": 1,
+        "quote": "we benchmark 9 HPO methods, spanning 4 classical, 4 LLM-based, and 1 hybrid, on Karpathy’s autoresearch task. All methods operate under the same 24-hour GPU training budget with 3 seeds."
+      },
+      {
+        "claim": "Ranking of top methods and failure-state tracking",
+        "location": "Section 5.1",
+        "page": 5,
+        "quote": "The top methods by mean best val_bpb are Centaur (0.9763), TPE (0.9768), SMAC (0.9778), CMA- ES (0.9785), and Karpathy Agent (Code) (0.9814)."
+      },
+      {
+        "claim": "LLM optimizers fail to learn which regions cause memory failures",
+        "location": "Section 5.1",
+        "page": 5,
+        "quote": "LLAMBO (Paper) and LLAMBO (Optuna) observe full trial history yet produce OOM rates (48% and 61%) comparable to random search (56%)"
+      },
+      {
+        "claim": "LLM share of Centaur trials should stay small",
+        "location": "Section 5.3",
+        "page": 8,
+        "quote": "the LLM is most effective as an occasional informed perturbation, not as the primary search driver."
+      }
+    ]
+  },
+  {
+    "title": "Optimizing Expert-Designed Crystal Graph Networks for Band-Gap Prediction with an Autonomous LLM Research Loop",
+    "authors": "Chenmu Zhang, Boris I. Yakobson",
+    "year": 2026,
+    "identifier": "2606.29717v3",
+    "category": "gnn_architecture",
+    "relevance": 5,
+    "summary": "A general-purpose coding agent (Claude Code, Opus 4.8) edits a crystal graph network training script in an autoresearch loop on the MatBench band-gap task (>100k crystals) and builds the most accurate from-scratch model, 0.1480 eV MAE. All accepted changes are rediscoveries of published crystal-GNN techniques; the model does not transfer to other MatBench tasks; the loop stalls on small edits, which a residual-correlation crowding score partly fixes.",
+    "relevance_to_project": "Closest published precedent to our setting: an LLM agent building and tuning a message-passing GNN for a materials property, including log10 shear modulus. Gives a design for a stagnation detector based on correlated residuals, a held-out fixed evaluation script the agent cannot edit, and a warning against reading search-tuned gains as general design improvements. Not lattice or stiffness-tensor data.",
+    "fulltext_source": "https://arxiv.org/pdf/2606.29717v3",
+    "venue": "LM4Sci Workshop, COLM 2026",
+    "url": "https://arxiv.org/abs/2606.29717v3",
+    "methods": "Autonomous coding-agent loop (Karpathy autoresearch setup), kept only if MAE falls by more than 0.002 eV; crowding score from Pearson correlation of per-sample error vectors",
+    "data": "MatBench mp_gap (>100k crystals, five-fold) and log_gvrh (~11k crystals, log10 shear modulus in GPa)",
+    "key_findings": "Band gap 0.1480 ± 0.003 eV vs coGN 0.1559 eV; 184 experiments; 5 of 5 accepted methods and 20 of 25 rejected were rediscoveries, 0 novel. On log_gvrh with crowding score MAE 0.0699 log10 GPa by experiment 40 vs 0.0721 floor without it over 160 experiments; agent then switched to a PaiNN-style equivariant network.",
+    "evidence": [
+      {
+        "claim": "Agent-built model beats all expert-designed from-scratch models on band gap",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "a general-purpose coding agent autonomously built the most accurate model trained without external pretraining, ahead of all seventeen expert- designed models reported for the task."
+      },
+      {
+        "claim": "Agent only edits model code; evaluation is fixed",
+        "location": "Section 2",
+        "page": 2,
+        "quote": "the agent edits only the model code, while data loading, the held-out fold, and the error computation are run by fixed scripts the agent cannot change"
+      },
+      {
+        "claim": "Changes are rediscoveries, none novel",
+        "location": "Section 3, Table 1",
+        "page": 5,
+        "quote": "All 5 accepted changes are rediscoveries, and 20 of the 25 the loop tried and reverted are also rediscoveries."
+      },
+      {
+        "claim": "Model tuned to one task does not transfer",
+        "location": "Section 4",
+        "page": 5,
+        "quote": "our model beats coGN on the band gap but loses to it on all four other tasks, by six to thirty-three percent."
+      },
+      {
+        "claim": "Crowding score definition from per-crystal residual correlations",
+        "location": "Section 5, Eq. 1",
+        "page": 6,
+        "quote": "A model’s residual vector is its fingerprint, so two highly similar models produce residual vectors that are highly correlated, giving a high ρ."
+      },
+      {
+        "claim": "Crowding score triggered switch to equivariant network",
+        "location": "Section 5",
+        "page": 6,
+        "quote": "the agent switched to a PaiNN-style equivariant network, one that carries directional vector features alongside the usual scalar ones (Schütt et al., 2021), at experiment 16."
+      }
+    ]
+  },
+  {
+    "title": "Using Large Language Models for Hyperparameter Optimization",
+    "authors": "Michael R. Zhang, Nishkrit Desai, Juhan Bae, Jonathan Lorraine, Jimmy Ba",
+    "year": 2023,
+    "identifier": "2312.04528v2",
+    "category": "other",
+    "relevance": 4,
+    "summary": "Prompts LLMs with a problem description and trial history to propose hyperparameters; on HPOBench and CIFAR-10 ViT/ResNet tuning, LLMs match or beat random search and Bayesian optimization at small budgets (about 30 evaluations), and can also output model code treated as a hyperparameter.",
+    "relevance_to_project": "Supports the claim that an LLM proposer is most useful in the first few evaluations, which matches a limited-compute budget for a GNN on a 17k-sample dataset. Also the origin of the code-as-hyperparameter idea. Later studies (Ferreira 2026) find the advantage disappears with larger budgets and fixed spaces.",
+    "fulltext_source": "https://arxiv.org/pdf/2312.04528v2",
+    "venue": "arXiv preprint (v2, Nov 2024)",
+    "url": "https://arxiv.org/abs/2312.04528v2",
+    "methods": "Chat and compressed prompting; chain-of-thought; code generation for model and optimizer",
+    "data": "HPOBench (8 datasets, 4 model types), CIFAR-10 ViT and ResNet",
+    "evidence": [
+      {
+        "claim": "LLMs match or beat BO under small budgets",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "within constrained search budgets, LLMs can match or outperform traditional HPO methods like Bayesian optimization across different models on standard benchmarks."
+      },
+      {
+        "claim": "Code treated as a hyperparameter",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "we propose to treat the code specifying our model as a hyperparameter, which the LLM outputs and affords greater flexibility than existing HPO approaches."
+      },
+      {
+        "claim": "Advantage is in the early phase, complement to classical methods",
+        "location": "Section 1",
+        "page": 1,
+        "quote": "LLMs were effective at proposing hyperparameters during initial search phases, making them valuable both for limited-budget scenarios and as a complement to traditional approaches when larger search budgets are available."
+      }
+    ]
+  },
+  {
+    "title": "Greedy Is a Strong Default: Agents as Iterative Optimizers",
+    "authors": "Yitao Li",
+    "year": 2026,
+    "identifier": "2603.27415v1",
+    "category": "other",
+    "relevance": 4,
+    "summary": "Replaces the random proposal generator of hill climbing and simulated annealing with an LLM agent (Claude Opus 4.6) that reads evaluation diagnostics. Across four tasks, greedy acceptance matches or beats simulated annealing and parallel investigators with 2-3 times fewer evaluations, and matches Optuna TPE or CMA-ES with fewer evaluations on LoRA and XGBoost tuning.",
+    "relevance_to_project": "Shows an agent that reads diagnostics (cross-validation, error analysis) rather than only the scalar metric can tune cheaply; also a clean three-way protocol (investigator sees train diagnostics only, reviewer uses validation, test touched once) that we should copy for the lattice GNN. Small tasks, 3 runs each, authors say it may not generalize.",
+    "fulltext_source": "https://arxiv.org/pdf/2603.27415v1",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2603.27415v1",
+    "methods": "Orchestrator/Investigator/Reviewer agents under Claude Code; greedy vs simulated annealing vs parallel investigators",
+    "data": "Breast Cancer rules; MobileNetV3-Small on STL-10; LoRA Qwen2.5-0.5B on SST-2; XGBoost on Adult",
+    "key_findings": "STL-10: agentic mean test accuracy 0.852 in about 8 trials with 0% failures vs random search 0.855 in 30 trials with 60% failures and SMAC 0.840 with 33% failures.",
+    "evidence": [
+      {
+        "claim": "Greedy hill climbing matches SA, ties Optuna TPE / CMA-ES with fewer evaluations",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "LoRA fine-tuning of Qwen2.5-0.5B on SST-2 (89.5% → 92.7%, matching Optuna TPE with 2× efficiency), and XGBoost on Adult Census (AUC 0.9297 → 0.9317, tying CMA-ES with 3 × fewer evaluations)."
+      },
+      {
+        "claim": "Agent proposes from diagnostics such as error analysis",
+        "location": "Section 2.5",
+        "page": 2,
+        "quote": "The Investigator reads diagnostic output—cross-validation results, error analysis, misclassification patterns—and proposes changes based on reasoning about observed patterns."
+      },
+      {
+        "claim": "Information barrier between investigator, reviewer, and test set",
+        "location": "Section 2.7",
+        "page": 3,
+        "quote": "The Investigator sees only training and cross-validation diagnostics—never test metrics."
+      },
+      {
+        "claim": "Authors limit generality",
+        "location": "Section 1",
+        "page": 2,
+        "quote": "We do not claim this holds universally—on tasks with sharper local optima or weaker LLM priors, SA may still help."
+      }
+    ]
+  },
+  {
+    "title": "AgentHPOBench: A Benchmark For Evaluating LLM Agents as Sequential Hyperparameter Optimizers",
+    "authors": "Tianyu Huai, Tingshuo Fan, Xinchi Chen, Yining Zheng, Yuxin Wang, Shuang Chen, Jie Zhou, Xuanjing Huang",
+    "year": 2026,
+    "identifier": "2607.29626",
+    "category": "other",
+    "relevance": 4,
+    "summary": "30 executable ML repositories (including 2 graph-learning tasks); after a baseline run each agent makes 5 sequential hyperparameter interventions seeing configs, metrics and logs. 12 agents are compared with random search, TPE and a BOHB variant under the same budget. Strong API agents beat conventional HPO in aggregate, but not uniformly across categories, and later interventions often plateau or discard earlier gains.",
+    "relevance_to_project": "Evidence for the case where the agent reads logs (not only a scalar) and the budget is only a handful of runs, which is our tuning regime. Also supports reporting final-step rather than best-so-far results and warns that agents can degrade a baseline in 1 of 4 tasks. Only 2 graph tasks, none on materials or regression surrogates.",
+    "fulltext_source": "https://arxiv.org/pdf/2607.29626",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2607.29626",
+    "methods": "Mean bounded normalized score (MBNS), baseline win rate (BWR), anchor attainment (MAA); limited budget uses about 10% of original training budget per run",
+    "data": "30 tasks across NLP, CV, time series, graph, RL, LLM, structured learning",
+    "key_findings": "Limited budget, 5 interventions: Claude Sonnet 4.6 MBNS 0.407, BWR 76.7%, MAA 79.5%; best conventional (BOHB variant) MBNS 0.018, random search BWR 48.9%, TPE MBNS -0.113. Graph category: Claude Sonnet 4.6 0.877, GPT-5.5 0.281, TPE -0.406, random search -0.463 (only 2 tasks).",
+    "evidence": [
+      {
+        "claim": "Benchmark design: 30 tasks, 7 categories, sequential interventions with logs",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "AgentHPOBench, a sequential benchmark comprising 30 executable machine learning tasks across seven research categories. Each task begins with a validated baseline run, after which an agent performs several sequential interventions."
+      },
+      {
+        "claim": "Limitations of agents: sustained refinement and log diagnosis",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "current agents exhibit measurable experimental optimization ability acrossdomains, butstillfaceclearlimitationsinsustainediterativerefinement, complexlogdiagnosis, and consistent progress toward reported reference performance."
+      },
+      {
+        "claim": "Protocol: 5 interventions, ~10% budget, final-step scoring",
+        "location": "Section 4",
+        "page": 7,
+        "quote": "requests five sequential interventions from the agent. Under this protocol, both the baseline and each intervention use approximately 10% of the training budget of the corresponding original experiment."
+      },
+      {
+        "claim": "Headline results versus conventional HPO",
+        "location": "Table 2 and Section 4",
+        "page": 8,
+        "quote": "Claude Sonnet 4.6 achieves the highest overall MBNS of 0.407, the highest BWR of 76.7%, and the highest MAA of 79.5%."
+      },
+      {
+        "claim": "Conventional HPO methods given only configurations and metric values, agents given logs and context",
+        "location": "Section 4",
+        "page": 8,
+        "quote": "The conventional HPO baselines operate on previously evaluated configurations and target metric values, whereas agents additionally receive task context, auxiliary metrics, and execution logs."
+      },
+      {
+        "claim": "Even strong agents can fail to improve baseline",
+        "location": "Section 4",
+        "page": 8,
+        "quote": "even strong agents can produce final configurations that do not improve the baseline."
+      }
+    ]
+  },
+  {
+    "title": "A Closer Look at Agentic BBO: Benchmarking LLM Agents for Black-Box Optimization",
+    "authors": "Ming Chen, Rong-Xi Tan, Ke Xue, Yu-Jie Zhou, Taiye Lu, Zhi-Xuan Gao, Peng Xie, Zijun Shen, Chen Lu, Haopu Shang, Chao Qian",
+    "year": 2026,
+    "identifier": "2610.12183",
+    "category": "other",
+    "relevance": 4,
+    "summary": "AgenticBBO-Bench compares LLM agents that can plan, write code and call optimizers against direct LLM-based methods and numerical optimizers (e.g. TPE, TuRBO) across synthetic functions, hyperparameter optimization (Bayesmark), database tuning, chip placement and molecular design under a finite evaluation budget. Agents outperform the best numerical optimizers in four of five domains; extra numerical tools do not consistently help, task semantics help, specific priors are unreliable.",
+    "relevance_to_project": "Counter-evidence to Ferreira 2026: when the LLM is a full agent with optimizers as tools, it can beat the best numerical optimizer. Informs the choice to expose Optuna/BO as a tool to the agent rather than as a competitor, and to report token cost. Read pages 1-4 only (abstract, introduction, formulation); the result tables were not read.",
+    "fulltext_source": "https://arxiv.org/pdf/2610.12183",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2610.12183",
+    "methods": "Agentic BBO formalized as agent-chosen intermediate actions before each expensive evaluation; ablations on tools, task information, LLM involvement",
+    "data": "BBOB synthetic, Bayesmark HPO, database tuning, BBOPlace-Bench, GuacaMol",
+    "evidence": [
+      {
+        "claim": "Agentic BBO beats direct LLM methods in all five domains and best numerical optimizers in four",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "agentic BBO achieves higher family-averaged scores than direct LLM-based methods in all five domains and outperforms the best numerical optimizers in four."
+      },
+      {
+        "claim": "Extra numerical tools do not reliably help; task semantics do",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "additional numerical tools do not consistently improve performance, task semantics are broadly useful while more specific priors are less reliable"
+      },
+      {
+        "claim": "Classical optimizer is one tool the agent can use",
+        "location": "Section 3",
+        "page": 4,
+        "quote": "Under this view, a classical BBO optimizer is only one possible tool available to the agent."
+      }
+    ]
+  },
+  {
+    "title": "MLIPilot: LLM-Driven Auto-Research for Machine-Learned Interatomic Potentials",
+    "authors": "Etinosa Osaro, Santosh Adhikari, Stamatia Zavitsanou, Kelsey Parker, Dario Rocca",
+    "year": 2026,
+    "identifier": "2605.30889v1",
+    "category": "gnn_architecture",
+    "relevance": 4,
+    "summary": "Autoresearch-style loop where tool-calling LLMs propose hypotheses, edit MACE training code, run HPC jobs, and accept or revert changes against a physically constrained scorecard with hard gates at 4 times the target. Four agents (GPT-5.5, GPT-4.1, Mistral-24B, Qwen3-32B) get 10 train-and-evaluate iterations on QM7 (B3LYP) and Cu EMT supercells.",
+    "relevance_to_project": "Shows an agent improving an equivariant message-passing model through architecture and loss changes (output normalization, Huber loss), and a hard-gate acceptance rule that blocks gains in the headline loss that break a physical requirement. For our project the analogue is gating on positive-definiteness of the assembled stiffness and bounds on Poisson ratios. Small budgets (10 iterations), selection set reused as test set, authors say a sealed test is still needed; no comparison with Optuna.",
+    "fulltext_source": "https://arxiv.org/pdf/2605.30889v1",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2605.30889v1",
+    "methods": "Accept only if composite score improves and every metric is within a gate of 4 x target; SHA-256 hash of the fixed evaluation harness; submissions must state hypothesis, target metric and risk",
+    "data": "QM7 B3LYP/6-31G(d) 7,165 molecules (5,015/1,433/717 split); Cu EMT 200 supercells (140/40/20)",
+    "key_findings": "QM7: GPT-5.5 reaches 9.52 meV/atom energy and 9.83 meV/Å force MAE (score 0.831), Mistral 1.061, GPT-4.1 1.288, Qwen3-32B 1.818; GPT-5.5 alone changed architecture (ScaleShiftMACE) and loss (Huber). Cu EMT: GPT-5.5 0.57 meV/atom energy MAE.",
+    "evidence": [
+      {
+        "claim": "Framework: LLM edits MACE training code with accept/revert against physical scorecard",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "tool-calling large language models propose hypotheses, edit MLIP training code, launch HPC jobs, and accept or revert changes using a fixed, physically constrained scorecard."
+      },
+      {
+        "claim": "Hard gate rule",
+        "location": "Section 3.2",
+        "page": 3,
+        "quote": "Hard gates enforce that no single metric can be worse than 4 × target regardless of how favorable other metrics appear."
+      },
+      {
+        "claim": "Gate caught a failure invisible to the training loss",
+        "location": "Section 3.2 / Table 3",
+        "page": 3,
+        "quote": "A subsequent experiment (500 epochs) passes the energy gate but causes NVE drift of 6.59 meV/atom/ps, exceeding the 4 meV/atom/ps drift gate, and is rejected despite lower energy."
+      },
+      {
+        "claim": "Only the strongest agent made architectural changes; results table",
+        "location": "Section 4.3, Tables 2-3",
+        "page": 6,
+        "quote": "GPT-5.5is the only agent to makearchitecturalchanges."
+      },
+      {
+        "claim": "Selection set doubles as test set",
+        "location": "Section 4.2",
+        "page": 5,
+        "quote": "we treat the repeatedly evaluated held-out split as a validation/selection set rather than a fully blind test set; a separate sealed test set will be required for definitive generalization estimates."
+      },
+      {
+        "claim": "Budget of 10 iterations per agent",
+        "location": "Section 4.2",
+        "page": 5,
+        "quote": "Each received budget B=10 (up to ten train-and-evaluate iterations)"
+      }
+    ]
+  },
+  {
+    "title": "Automating Data-Driven Modeling and Analysis for Engineering Applications using Large Language Model Agents",
+    "authors": "Yang Liu, Zaid Abulawi, Abhiram Garimidi, Doyeong Lim",
+    "year": 2025,
+    "identifier": "2510.01398v1",
+    "category": "surrogate_model",
+    "relevance": 4,
+    "summary": "Multi-agent and single ReAct agent systems (OpenAI Agent SDK, GPT-4.1 and o3) autonomously preprocess data, build and train neural networks, optimize hyperparameters and quantify uncertainty on the OECD/NEA critical heat flux benchmark (~25,000 points). Agent-built models reach RMSE close to a human-expert Bayesian-optimized deep ensemble.",
+    "relevance_to_project": "A direct engineering-surrogate precedent with a human-expert Bayesian-optimization baseline and quantified run-to-run variability (10 trials per system) and error-recovery behaviour (agent reads an error log and patches its own code). Tabular DNN regression, not GNN; the agents ran their own training on a blind-test benchmark.",
+    "fulltext_source": "https://arxiv.org/pdf/2510.01398v1",
+    "venue": "arXiv preprint (Elsevier submission)",
+    "url": "https://arxiv.org/abs/2510.01398v1",
+    "methods": "Supervisor/Coding/Execution/Tuning multi-agent system vs ReAct single agent; human baseline uses Sobol initialization then GP-based Bayesian optimization with noisy expected improvement, 5 runs, top-15 network deep ensemble",
+    "data": "NRC CHF database, ~25,000 experimental points; blind test set; RMSE in kW/m^2",
+    "key_findings": "Test RMSE 228.9 kW/m^2 (human Bayesian-optimized deep ensemble), 230.2 (multi-agent), 234.4 (ReAct agent) for the reported model; average over 10 trials 250.4 vs 251.1 kW/m^2. Multi-agent used about 68% fewer tokens (11,287 vs 35,311). 7 of 10 multi-agent runs and 6 of 10 ReAct runs completed with no error.",
+    "evidence": [
+      {
+        "claim": "Agent models reach accuracy on par with human-expert Bayesian optimized deep networks",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "our LLM-agent-developed model surpasses traditional CHF lookup tables and delivers predictive accuracy and UQ on par with state-of-the-art Bayesian optimized deep neural network models developed by human experts."
+      },
+      {
+        "claim": "Human baseline hyperparameter search",
+        "location": "Section 3 / Table 5",
+        "page": 18,
+        "quote": "we initialized the search with a Sobol sequence, which quasi-randomly samples the hyperparameter space to provide a diverse set of initial configurations."
+      },
+      {
+        "claim": "10-trial statistics for the two agent systems",
+        "location": "Table 6",
+        "page": 19,
+        "quote": "Average CHF RMSE on testing data 250.4 251.1"
+      },
+      {
+        "claim": "RMSE of human, multi-agent and ReAct models",
+        "location": "Section 4.2",
+        "page": 23,
+        "quote": "the trained Bayesian optimized deep ensemble model has testing data RMSE with 228.9kW/m 2; while for Multi-agent developed model and ReAct-agent developed model, this values are 230.2kW/m2 and 234.4kW/m2, respectively."
+      },
+      {
+        "claim": "Agent diagnosed and patched a runtime error",
+        "location": "Section 4.1",
+        "page": 21,
+        "quote": "The agent’s subsequent Thought was to diagnose the failure by reading the log file."
+      }
+    ]
+  },
+  {
+    "title": "Proficient Graph Neural Network Design by Accumulating Knowledge on Large Language Models",
+    "authors": "Jialiang Wang, Hanmo Liu, Shimin Di, Zhili Wang, Jiachuan Wang, Lei Chen, Xiaofang Zhou",
+    "year": 2026,
+    "identifier": "2408.06717v3",
+    "category": "gnn_architecture",
+    "relevance": 4,
+    "summary": "DesiGNN converts past GNN design results from benchmarks (NAS-Bench-Graph) and literature insights into structured meta-knowledge that an LLM uses to propose GNN architectures for unseen graph datasets, without training on the new data. Shows plain LLMs propose generic GNNs and are misled by descriptive text.",
+    "relevance_to_project": "The only paper found that targets LLM design of GNN architectures as such, and its two failure modes (generic suggestions; being misled by surface descriptions) apply to a lattice-GNN agent. Evaluated on node-classification benchmarks (citation, coauthor), not periodic graphs or regression; not compared against Optuna or BO.",
+    "fulltext_source": "https://arxiv.org/pdf/2408.06717v3",
+    "venue": "WSDM 2026",
+    "url": "https://arxiv.org/abs/2408.06717v3",
+    "methods": "Graph-property confidence via Kendall tau between property distance and transfer performance; LLM aligns properties with literature; refinement from accumulated knowledge",
+    "data": "NAS-Bench-Graph (nine datasets, 26,206 architectures); 3 out-of-distribution datasets, 8 benchmarks",
+    "key_findings": "Initial proposals rank in the top 5.77% of all possible architectures within seconds, per the authors.",
+    "evidence": [
+      {
+        "claim": "LLMs struggle to design GNNs and are noisy; proposed framework yields top-5.77% initial proposals",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "DesiGNN can deliver top- 5.77% initial model proposals for unseen datasets within seconds"
+      },
+      {
+        "claim": "Two failure modes of LLM GNN design",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "(1) theinherentknowledge gaps in modeling the intricate, varying relationships between graph properties and suitable architectures and (2) theexternal noise from misleading descriptive inputs"
+      },
+      {
+        "claim": "Prior LLM-GNN design methods refine from test feedback only",
+        "location": "Section 2.2",
+        "page": 3,
+        "quote": "Refin- ing model designs solely based on feedback from testing models, lacking actionable, knowledge-driven search strategies."
+      }
+    ]
+  },
+  {
+    "title": "Large Language Model Agent for Hyper-Parameter Optimization",
+    "authors": "Siyi Liu, Chen Gao, Yong Li",
+    "year": 2024,
+    "identifier": "2402.01881v3",
+    "category": "other",
+    "relevance": 3,
+    "summary": "AgentHPO uses a Creator agent that proposes hyperparameters from a natural-language task description and an Executor agent that trains models, records logs and analyzes results; the Creator then iterates on the history. On 12 ML tasks it matches or often surpasses the best human trials with explanations. Read pages 1-4 (introduction and method); the experiments were not read.",
+    "relevance_to_project": "Early agentic HPO design with explicit log analysis and interpretability; comparison is against human trials rather than against Optuna or BO in the pages read, so it does not address the optimizer question.",
+    "fulltext_source": "https://arxiv.org/pdf/2402.01881v3",
+    "venue": "CPAL 2025",
+    "url": "https://arxiv.org/abs/2402.01881v3",
+    "evidence": [
+      {
+        "claim": "Matches or surpasses best human trials on 12 tasks",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "AgentHPO not only matches but also often surpasses the best human trials in terms of performance while simultaneously providing explainable results."
+      },
+      {
+        "claim": "Two-agent design",
+        "location": "Section 1",
+        "page": 2,
+        "quote": "AgentHPO is innovatively designed with two specialized agents: Creator and Executor."
+      }
+    ]
+  },
+  {
+    "title": "Agentic Search Spaces for Tabular Machine Learning",
+    "authors": "Renat Sergazinov, Artem Chistyakov, Sergey Pankevich, Artem Babenko",
+    "year": 2026,
+    "identifier": "2609.16309",
+    "category": "other",
+    "relevance": 4,
+    "summary": "An LLM agent (Claude Code, Opus 4.8) writes candidate code modules (preprocessing, embeddings, architecture, training, inference) once per model family, and a classical HPO (Optuna TPE, 200 trials) searches the enlarged joint space on each dataset. Gains over author-provided spaces average 0.5-0.8% (2.0% on small-to-medium regression) across 45 datasets at equal tuning budget. An end-to-end autoresearch loop was marginally worse than classical HPO (-0.1%) at $20-50 per dataset.",
+    "relevance_to_project": "A concrete division of labour: agent expands the search space (including architecture alternatives and loss/target transforms), classical optimizer does the search. Fits our setting of tuning a lattice GNN with Optuna while letting an agent propose architecture variants. Tabular data, not graphs.",
+    "fulltext_source": "https://arxiv.org/pdf/2609.16309",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2609.16309",
+    "methods": "Agent-generated modules as categorical variables; Optuna TPE with 20 random starts; 200 trials small/medium, 100 large",
+    "data": "45 datasets from TabM, TabArena, TabReD; native metrics (RMSE, AUROC, etc.)",
+    "evidence": [
+      {
+        "claim": "Agent expands search space; classical HPO searches it",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "We then task the agent to propose candidate code implementations for each module and use a classical HPO algorithm to jointly optimize over these candidates and the model’s default hyperparameters."
+      },
+      {
+        "claim": "Gains at equal budget",
+        "location": "Abstract",
+        "page": 1,
+        "quote": "average relative gains of 0.6%, rising to 2.0% on small-to- medium regression datasets. Notably, these gains come at no extra tuning cost"
+      },
+      {
+        "claim": "End-to-end autoresearch loop was no better than classical HPO and costlier",
+        "location": "Section 3.2, Table 3",
+        "page": 4,
+        "quote": "the loop costs $20–50per dataset, requires handing the agent the data, and ends up marginally behind classical HPO over the default HPO space."
+      },
+      {
+        "claim": "Optuna TPE with 200 trials",
+        "location": "Section 3.1",
+        "page": 4,
+        "quote": "We tune each model over its HPO space with Optuna’s univariate Tree-structured Parzen Estimator (TPE) sampler"
+      }
+    ]
+  },
+  {
+    "title": "AutoML-Agent: A Multi-Agent LLM Framework for Full-Pipeline AutoML",
+    "authors": "Patara Trirat, Wonyong Jeong, Sung Ju Hwang",
+    "year": 2024,
+    "identifier": "2410.02958v2",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Multi-agent LLM framework that covers the full AutoML pipeline from natural-language request through data retrieval, model search and hyperparameter tuning to deployment. Abstract only was read; the abstract states the aim and does not give comparison numbers in the portion returned.",
+    "relevance_to_project": "Representative full-pipeline agentic AutoML system; background for the multi-agent design of our system. Not tested against Optuna in the abstract and not on graphs or materials.",
+    "fulltext_source": "abstract only",
+    "venue": "arXiv preprint",
+    "url": "https://arxiv.org/abs/2410.02958v2",
+    "evidence": [
+      {
+        "claim": "Full-pipeline multi-agent LLM AutoML",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "AutoML-Agent: A Multi-Agent LLM Framework for Full-Pipeline AutoML"
+      }
+    ]
+  },
+  {
+    "title": "SELA: Tree-Search Enhanced LLM Agents for Automated Machine Learning",
+    "authors": "Yizhou Chi, Yizhang Lin, Sirui Hong, Duyi Pan et al.",
+    "year": 2024,
+    "identifier": "2410.17238v1",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Uses Monte Carlo tree search over pipeline configurations so LLM agents explore AutoML more diversely than one-shot or repeated code generation, which the authors say gives low-diversity, suboptimal code.",
+    "relevance_to_project": "Tree-search structure for the tuning agent if single-trajectory greedy loops stall; abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2410.17238v1",
+    "evidence": [
+      {
+        "claim": "LLM agents produce low-diversity code; MCTS used to address this",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "they often generate low-diversity and suboptimal code, even after multiple iterations."
+      }
+    ]
+  },
+  {
+    "title": "AIDE: AI-Driven Exploration in the Space of Code",
+    "authors": "Zhengyao Jiang, Dominik Schmidt, Dhruv Srikanth, Dixing Xu et al.",
+    "year": 2025,
+    "identifier": "2502.13138v1",
+    "category": "other",
+    "relevance": 3,
+    "summary": "ML engineering agent that frames model development as code optimization and explores a tree of solutions with LLM-proposed edits.",
+    "relevance_to_project": "Standard agent scaffold underlying MLE-bench results; abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2502.13138v1",
+    "evidence": [
+      {
+        "claim": "Frames ML engineering as code optimization",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "AIDE frames machine learning engineering as a code optimization problem"
+      }
+    ]
+  },
+  {
+    "title": "MLE-bench: Evaluating Machine Learning Agents on Machine Learning Engineering",
+    "authors": "Jun Shern Chan, Neil Chowdhury, Oliver Jaffe, James Aung et al.",
+    "year": 2024,
+    "identifier": "2410.07095v6",
+    "category": "other",
+    "relevance": 3,
+    "summary": "75 Kaggle competitions used to measure ML-engineering agents; best setup (o1-preview with AIDE) reaches at least a bronze medal in 16.9% of competitions.",
+    "relevance_to_project": "Benchmark context for what agents can and cannot do on end-to-end ML tasks; none are scientific surrogate regression. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2410.07095v6",
+    "evidence": [
+      {
+        "claim": "Best setup bronze medal in 16.9% of competitions",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "achieves at least the level of a Kaggle bronze medal in 16.9% of competitions."
+      }
+    ]
+  },
+  {
+    "title": "AI Research Agents for Machine Learning: Search, Exploration, and Generalization in MLE-bench",
+    "authors": "Edan Toledo, Karen Hambardzumyan, Martin Josifoski, Rishi Hazra et al.",
+    "year": 2025,
+    "identifier": "2507.02554v2",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Formalizes AI research agents as search policies over candidate solutions and varies operator sets and search policies (Greedy, MCTS, Evolutionary), showing that their interplay is critical.",
+    "relevance_to_project": "Design guidance on search policy and operators for a model-building agent; abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2507.02554v2",
+    "evidence": [
+      {
+        "claim": "Agents as search policies; operator-policy interplay is critical",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "By designing and systematically varying different operator sets and search policies (Greedy, MCTS, Evolutionary), we show that their interplay is critical for achieving high performance."
+      }
+    ]
+  },
+  {
+    "title": "MLAgentBench: Evaluating Language Agents on Machine Learning Experimentation",
+    "authors": "Qian Huang, Jian Vora, Percy Liang, Jure Leskovec",
+    "year": 2023,
+    "identifier": "2310.03302v2",
+    "category": "other",
+    "relevance": 2,
+    "summary": "13 ML experimentation tasks (from CIFAR-10 to BabyLM) with a ReAct-based research agent that reads/writes files and runs code.",
+    "relevance_to_project": "Early benchmark for experimentation agents; abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2310.03302v2",
+    "evidence": [
+      {
+        "claim": "13 tasks, ReAct agent",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "we introduce MLAgentBench, a suite of 13 tasks ranging from improving model performance on CIFAR-10 to recent research problems like BabyLM."
+      }
+    ]
+  },
+  {
+    "title": "LLM4GNAS: A Large Language Model Based Toolkit for Graph Neural Architecture Search",
+    "authors": "Yang Gao, Hong Yang, Yizhi Chen, Junxian Wu et al.",
+    "year": 2025,
+    "identifier": "2502.10459v1",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "Toolkit for graph neural architecture search where LLM prompts adapt GNAS algorithms to new search spaces.",
+    "relevance_to_project": "LLM-driven GNN architecture search; applies to generic graph learning, no materials or periodic graphs in the abstract. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2502.10459v1",
+    "evidence": [
+      {
+        "claim": "Adapts GNAS to new search spaces via prompt modification",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "enabling the adaptation of GNAS methods to new search spaces through the modification of LLM prompts."
+      }
+    ]
+  },
+  {
+    "title": "GNN-CB: A Graph Neural Network Competition Benchmark for Human and LLM Evaluation",
+    "authors": "Murad Hossen, Tasneem Selim, Gurur Gamgam, Tuga Yousif et al.",
+    "year": 2026,
+    "identifier": "2610.05387v1",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "18 competitions spanning node-, edge- and graph-level prediction used to evaluate whether humans and LLMs can solve end-to-end GNN coding tasks.",
+    "relevance_to_project": "Benchmark of LLM ability to write GNN code, relevant to whether an agent can implement a periodic-graph model; results not read (abstract only).",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2610.05387v1",
+    "evidence": [
+      {
+        "claim": "First competition-style benchmark for LLM GNN coding",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "GNN-CB consists of 18 curated competitions spanning node-, edge-, and graph-level prediction across diverse graph categories, domains, and difficulty tiers."
+      }
+    ]
+  },
+  {
+    "title": "Lang2MLIP: End-to-End Language-to-Machine Learning Interatomic Potential Development with Autonomous Agentic Workflows",
+    "authors": "Wenwen Li, Yuki Orimo, Nontawat Charoenphakdee",
+    "year": 2026,
+    "identifier": "2605.14527v1",
+    "category": "gnn_architecture",
+    "relevance": 3,
+    "summary": "Multi-agent framework that takes natural-language input and formulates end-to-end MLIP development, including active-learning curriculum, as a sequential decision problem.",
+    "relevance_to_project": "Agent that builds a GNN-type potential from data generation to training; relevant for data-generation decisions (adding data where the model fails). Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2605.14527v1",
+    "evidence": [
+      {
+        "claim": "Natural-language input to end-to-end MLIP development as sequential decision-making",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "takes natural-language input and formulates end-to-end MLIP development as a sequential decision-making problem"
+      }
+    ]
+  },
+  {
+    "title": "MLIP Detective: Active Failure Mode Discovery Beyond Benchmark Scores for Machine-Learning Interatomic Potentials",
+    "authors": "Ryuhei Okuno, Nontawat Charoenphakdee, Kaoru Hisama, Yuta Tsuboi",
+    "year": 2026,
+    "identifier": "2609.08399v1",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Agentic framework that, starting from benchmark evidence, generates falsifiable physics-informed failure hypotheses for universal interatomic potentials, screens them with cheap simulations and escalates the most suspicious cases to human experts.",
+    "relevance_to_project": "Closest example found of an agent diagnosing why a trained scientific ML model fails, rather than tuning it. The hypothesis-then-cheap-test structure would transfer to probing a lattice GNN (e.g. bending-dominated, low-connectivity, or high-anisotropy lattices). Diagnosis only, no remedy step in the abstract. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2609.08399v1",
+    "evidence": [
+      {
+        "claim": "Agent generates failure hypotheses, screens with cheap simulation, escalates to humans",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "generates falsifiable, physics-informed failure hypotheses, screens them with inexpensive simulations, and escalates only the most suspicious cases to human experts"
+      }
+    ]
+  },
+  {
+    "title": "Optuna vs Code Llama: Are LLMs a New Paradigm for Hyperparameter Tuning?",
+    "authors": "Roman Kochnev, Arash Torabi Goodarzi, Zofia Antonina Bentyn, Dmitry Ignatov et al.",
+    "year": 2025,
+    "identifier": "10.1109/ICCVW69036.2025.00598",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Fine-tunes Code Llama with LoRA to recommend hyperparameters across vision architectures and compares against Optuna in RMSE and compute; the abstract says it is competitive or superior in RMSE with much lower overhead.",
+    "relevance_to_project": "One of the few direct Optuna comparisons, but it is a fine-tuned recommender trained on past runs, not an agent reading logs, and is for vision models. Abstract only; the exact RMSE definition was not read.",
+    "fulltext_source": "abstract only",
+    "venue": "ICCV Workshops 2025",
+    "url": "https://arxiv.org/abs/2504.06006v4",
+    "evidence": [
+      {
+        "claim": "Competitive or superior RMSE to Optuna with less compute",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "our approach achieves competitive or superior Root Mean Square Error (RMSE) while substantially reducing computational overhead"
+      }
+    ]
+  },
+  {
+    "title": "Rapid and Automated Alloy Design with Graph Neural Network-Powered LLM-Driven Multi-Agent Systems",
+    "authors": "Alireza Ghafarollahi, Markus J. Buehler",
+    "year": 2024,
+    "identifier": "2410.13768v1",
+    "category": "inverse_design",
+    "relevance": 3,
+    "summary": "LLM-driven agents collaborate on alloy design guided by a newly developed GNN for rapid retrieval of physical properties of NbMoTa body-centred cubic alloys.",
+    "relevance_to_project": "Here the GNN is a tool the agents call, not something the agents build or tune. Useful as a downstream use of a stiffness surrogate in an agentic design loop. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2410.13768v1",
+    "evidence": [
+      {
+        "claim": "GNN is a component for rapid property retrieval used by agents",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "a newly developed graph neural network (GNN) model for rapid retrieval of key physical properties"
+      }
+    ]
+  },
+  {
+    "title": "An Agentic Framework for Autonomous Metamaterial Modeling and Inverse Design",
+    "authors": "Darui Lu, Jordan M. Malof, Willie J. Padilla",
+    "year": 2025,
+    "identifier": "2506.06935v2",
+    "category": "surrogate_model",
+    "relevance": 3,
+    "summary": "An LLM agent for photonic metamaterial inverse design that, given a target spectrum, autonomously proposes and develops a forward deep learning model, calls simulation and optimization tools through APIs, and produces a design with a deep inverse method.",
+    "relevance_to_project": "Agent that builds its own forward surrogate for a metamaterial, the closest metamaterial-domain analogue to our system, but electromagnetic (optical spectra), not elastic stiffness, and not a GNN. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2506.06935v2",
+    "evidence": [
+      {
+        "claim": "Agent proposes and develops a forward deep learning model",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "the Agent autonomously proposes and develops a forward deep learning model, accesses external tools via APIs for tasks like simulation and optimization"
+      }
+    ]
+  },
+  {
+    "title": "MetaScientist: A Human-AI Synergistic Framework for Automated Mechanical Metamaterial Design",
+    "authors": "Jingyuan Qi, Zian Jia, Minqian Liu, Wangzhi Zhan et al.",
+    "year": 2024,
+    "identifier": "2412.16270v1",
+    "category": "inverse_design",
+    "relevance": 3,
+    "summary": "Human-in-the-loop system for mechanical metamaterials with a hypothesis-generation phase (LLM reasoning with domain foundation models and literature priors) and a 3D structure synthesis phase.",
+    "relevance_to_project": "Agentic system for mechanical metamaterials; focuses on hypothesis and structure generation, not on building or tuning stiffness surrogates. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2412.16270v1",
+    "evidence": [
+      {
+        "claim": "Two phases: hypothesis generation and 3D structure synthesis with expert oversight",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "a human-in-the-loop system that integrates advanced AI capabilities with expert oversight with two primary phases: (1) hypothesis generation"
+      }
+    ]
+  },
+  {
+    "title": "METASYMBO: Multi-Agent Language-Guided Metamaterial Discovery via Symbolic Latent Evolution",
+    "authors": "Jianpeng Chen, Wangzhi Zhan, Dongqi Fu, Junkai Zhang et al.",
+    "year": 2026,
+    "identifier": "2604.27300v1",
+    "category": "inverse_design",
+    "relevance": 3,
+    "summary": "Multi-agent framework for language-guided discovery of mechanical metamaterials where qualitative intents in natural language drive symbolic-latent evolution, addressing LLMs lack of geometric awareness and physical property validity.",
+    "relevance_to_project": "Mechanical-metamaterial agent system; again about design generation rather than surrogate construction. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2604.27300v1",
+    "evidence": [
+      {
+        "claim": "LLMs lack geometric awareness and physical validity for metamaterials",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "Large language models can interpret such intents, but they lack geometric awareness and physical property validity."
+      }
+    ]
+  },
+  {
+    "title": "MetaGen: A DSL, Database, and Benchmark for VLM-Assisted Metamaterial Generation",
+    "authors": "Liane Makatura, Benjamin Jones, Siyuan Bian, Wojciech Matusik",
+    "year": 2025,
+    "identifier": "2508.17568v1",
+    "category": "dataset",
+    "relevance": 2,
+    "summary": "A domain-specific language for metamaterials, a repository of more than 150,000 parameterized programs with 3D geometry, renderings and simulated elastic properties, and a benchmark for vision-language-model-assisted generation.",
+    "relevance_to_project": "Dataset where LLM/VLM agents operate on metamaterial programs with simulated elastic properties; not the lattice dataset we use. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2508.17568v1",
+    "evidence": [
+      {
+        "claim": "Repository of >150,000 programs with simulated elastic properties",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "MetaDB: a curated repository of more than 150,000 parameterized MetaDSL programs together with their derivatives-three-dimensional geometry, multi-view renderings, and simulated elastic properties."
+      }
+    ]
+  },
+  {
+    "title": "Large Language Model Agent as a Mechanical Designer",
+    "authors": "Yayati Jadhav, Amir Barati Farimani",
+    "year": 2024,
+    "identifier": "10.48550/arxiv.2404.17525",
+    "category": "inverse_design",
+    "relevance": 2,
+    "summary": "A pretrained LLM coupled with an FEM module autonomously generates, evaluates and refines structural designs from performance specifications and numerical feedback, without a trained surrogate.",
+    "relevance_to_project": "Shows LLM agents closing a loop with a physics solver (FEM) rather than a learned surrogate; a model for validating our surrogate against FEM or homogenization. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2404.17525",
+    "evidence": [
+      {
+        "claim": "LLM plus FEM module generates, evaluates and refines structural designs",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "a framework that leverages a pretrained Large Language Model (LLM) in conjunction with an FEM module to autonomously generate, evaluate, and refine structural designs"
+      }
+    ]
+  },
+  {
+    "title": "Objectives and Key Results–Driven Multiagent Framework for Mechanical Design and Simulation",
+    "authors": "Jie Tian, Lin Pang, Jixin Hou, Xiao Hui Sun et al.",
+    "year": 2026,
+    "identifier": "10.1002/aisy.70569",
+    "category": "other",
+    "relevance": 2,
+    "summary": "Peer multiagent framework in which LLMs take part directly in the idea-design-simulation loop of mechanics, translating informal intent into modeling assumptions, selecting physics and assembling solver inputs.",
+    "relevance_to_project": "Agents for solver setup in solid mechanics, relevant to label generation and defect-model setup rather than surrogate training. Abstract only.",
+    "fulltext_source": "abstract only",
+    "venue": "Advanced Intelligent Systems",
+    "evidence": [
+      {
+        "claim": "LLM agents participate in mechanics simulation setup",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "a coordinated peer multiagent framework that uses large language models (LLMs) to participate directly in mechanics"
+      }
+    ]
+  },
+  {
+    "title": "AutoMS: Multi-Agent Evolutionary Search for Cross-Physics Inverse Microstructure Design",
+    "authors": "Zhenyuan Zhao, Yu Xing, Tianyang Xue, Lingxin Cao et al.",
+    "year": 2026,
+    "identifier": "10.48550/arxiv.2603.27195",
+    "category": "inverse_design",
+    "relevance": 2,
+    "summary": "Multi-agent neuro-symbolic framework treating inverse microstructure design as LLM-driven evolutionary search with a simulation-aware numerical search mechanism, motivated by physical hallucinations in generative models and cost of topology optimization.",
+    "relevance_to_project": "Microstructure design with simulation in the loop; downstream use of a surrogate. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2603.27195",
+    "evidence": [
+      {
+        "claim": "Inverse design reformulated as LLM-driven evolutionary search",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "reformulates inverse design as an LLM-driven evolutionary search."
+      }
+    ]
+  },
+  {
+    "title": "The More You Automate, the Less You See: Hidden Pitfalls of AI Scientist Systems",
+    "authors": "Ziming Luo, Atoosa Kasirzadeh, Nihar B. Shah",
+    "year": 2025,
+    "identifier": "2509.08713v2",
+    "category": "other",
+    "relevance": 3,
+    "summary": "Identifies four failure modes of AI-scientist systems (inappropriate benchmark selection, data leakage, metric misuse, post-hoc selection bias) and designs controlled experiments to expose them.",
+    "relevance_to_project": "Checklist of evaluation hazards for our tuning agent: leakage between lattices of the same crystal system or family, metric choice on log vs linear moduli, and picking the best of many runs after the fact. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2509.08713v2",
+    "evidence": [
+      {
+        "claim": "Four failure modes",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "we identify four potential failure modes in contemporary AI scientist systems: inappropriate benchmark selection, data leakage, metric misuse, and post-hoc selection bias."
+      }
+    ]
+  },
+  {
+    "title": "Agentic AutoRAG: RAG Pipeline Optimization through Reasoning-Driven Agents",
+    "authors": "Lasse B. Strand, Robert Jakob, Kevin O’Sullivan, Markus Kreft",
+    "year": 2026,
+    "identifier": "2610.08452v1",
+    "category": "other",
+    "relevance": 3,
+    "summary": "LLM-agent optimizer for multi-objective RAG pipeline configuration that uses evidence about where a failure occurred (retrieval vs generation) rather than an aggregate score, contrasted with greedy search and Bayesian optimization in the abstract.",
+    "relevance_to_project": "Concrete instance of the diagnose-then-fix idea versus BO that reduces trials to a scalar; domain is RAG, not scientific surrogates. Abstract only; no results read.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2610.08452v1",
+    "evidence": [
+      {
+        "claim": "Existing optimizers reduce each trial to an aggregate score and do not model why a configuration performed as it did",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "Existing optimizers, from greedy search to Bayesian optimization, reduce each trial to an aggregate score and search without modeling why a configuration performed as it did"
+      }
+    ]
+  },
+  {
+    "title": "LLMs as In-Context Meta-Learners for Model and Hyperparameter Selection",
+    "authors": "Youssef Attia El Hili, Albert Thomas, Malik Tiomoko, Abdelhakim Benechehab et al.",
+    "year": 2025,
+    "identifier": "2510.26510v3",
+    "category": "other",
+    "relevance": 2,
+    "summary": "Converts datasets into interpretable metadata and prompts an LLM to recommend model families and hyperparameters, zero-shot or with examples from past tasks.",
+    "relevance_to_project": "Metadata-to-recommendation approach to initializing a search for a new dataset; tabular tasks. Abstract only.",
+    "fulltext_source": "abstract only",
+    "url": "https://arxiv.org/abs/2510.26510v3",
+    "evidence": [
+      {
+        "claim": "Two prompting strategies: zero-shot and meta-informed",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "We study two prompting strategies: (1) a zero-shot mode relying solely on pretrained knowledge, and (2) a meta-informed mode augmented with examples of models and their performance on past tasks."
+      }
+    ]
+  },
+  {
+    "title": "A Review of Machine Learning Applications in Mechanical Metamaterial Design",
+    "authors": "Galymzhan Turysbekov, Ulanbek Auyeskhan, Andrei Yankin, Asma Perveen et al.",
+    "year": 2026,
+    "identifier": "10.3390/ma19132766",
+    "category": "surrogate_model",
+    "relevance": 2,
+    "summary": "Review of ML for strut-based lattices and TPMS, covering dataset preparation, simulation-based validation and model families including DNN, CNN and GNN.",
+    "relevance_to_project": "Background on ML surrogates for lattices; appears in an OpenAlex search for agents and lattices but the abstract does not mention LLM agents, so no agentic work is evidenced here. Abstract only.",
+    "fulltext_source": "abstract only",
+    "venue": "Materials",
+    "evidence": [
+      {
+        "claim": "Review compares model architectures including GNNs for strut-based lattices",
+        "location": "Abstract",
+        "page": 0,
+        "quote": "It categorizes common architectures, including strut-based lattices and triply periodic minimal surfaces"
+      }
+    ]
+  }
+]

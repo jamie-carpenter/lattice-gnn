@@ -3,7 +3,7 @@
 # `search` and `menu` entries vary.
 
 data:
-  paths: [data/raw/subset_2000.txt]   # scripts/make_subset.py
+  paths: [Unit_Cell_Catalog/Unit_Cell_Catalog.txt]   # full catalog; studies used to run on data/raw/subset_2000.txt
   split_file: splits/main.json        # frozen once: python -m lattice_gnn.splits
 
 training:          # fixed for every run (any key of lattice_gnn.training.DEFAULTS)
@@ -30,12 +30,13 @@ optimizer:
   objective: loss     # loss | median_percent_error_moduli | median_abs_error_couplings | non_pd_rate
 
 budget:
-  runs: 40            # training runs per study
+  runs: 20            # training runs per study (3 repeats x 2 conditions, worksheet section 11)
   no_progress: 10     # stop after this many runs without a new best
 
-# Success: every threshold met on the validation families.
-# PLACEHOLDERS - set from the spec (agent_design_worksheet.md section 9), not by eye.
+# Stop early only if every threshold is met on the validation families.
+# No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy
+# thresholds are 0 and never met: studies stop on budget or no progress. Non-PD target is 0.
 thresholds:
-  median_percent_error_moduli: 10.0
-  median_abs_error_couplings: 0.05
+  median_percent_error_moduli: 0.0
+  median_abs_error_couplings: 0.0
   non_pd_rate: 0.0
