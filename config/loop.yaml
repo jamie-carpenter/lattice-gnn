@@ -31,7 +31,8 @@ optimizer:
 
 budget:
   runs: 20            # training runs per study (3 repeats x 2 conditions, worksheet section 11)
-  no_progress: 10     # stop after this many runs without a new best
+  # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
+  #                   # and baseline always use the full budget; set it only for exploratory studies.
 
 # Stop early only if every threshold is met on the validation families.
 # No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy

@@ -52,8 +52,6 @@ ever chooses to retune, the optimizer alone will match its error at the same bud
 negative outcome would show that the agentic layer adds nothing over the non-agent baseline.
 
 \subsection*{A2 \quad Related work}
-% TODO: Optuna citation pending; rebuild A2 with the retrieval agent later.
-% Papers and page citations checked by Jamie on 2026-11-01.
 \textbf{Domain.} Lumpe and Stankovi\'c~\cite{lumpe} built the catalog by decoding crystal networks
 into periodic strut lattices and computed the effective stiffness of each lattice by FE
 homogenization with Euler--Bernoulli beams ($E_s = 1$\,MPa, $\nu_s = 0.3$, $\rhob = 0.01$).
@@ -68,7 +66,8 @@ This result motivates both the positive-definiteness (PD) check and the PD outpu
 structural menu. No published errors on this catalog are directly comparable to mine, so all
 baselines in this project are my own.
 \textbf{Agents.} Ferreira et al.~\cite{ferreira} found that, in a fixed search space and under the
-same budget, CMA-ES and TPE consistently outperformed LLM agents [p.~1], and that the best method
+same budget, classical optimizers (CMA-ES and the tree-structured Parzen estimator, TPE)
+consistently outperformed LLM agents [p.~1], and that the best method
 used the LLM only as an occasional informed perturbation [pp.~5, 8]. In a sequential setting, where
 an agent reads the training logs and intervenes [p.~7], Huai et al.~\cite{huai} found the strongest
 agent above conventional optimizers [p.~8], although agents still struggled with complex log
@@ -112,8 +111,7 @@ answer escalations. The baseline runs Optuna alone over the same hyperparameters
 by a script written with Claude Code.}\label{fig:design}
 \end{figure}
 
-\subsection*{C2 \quad Why each part is needed}
-What stops working if each part is removed:
+\subsection*{C2 \quad Why each part is needed: what breaks if it is removed}
 \begin{itemize}
 \item \textbf{Train (tool):} the agent has nothing to diagnose, and its choices have no effect.
 \item \textbf{Evaluate (tool):} the agent cannot tell which families fail, and no LLM-free verdict
@@ -135,23 +133,21 @@ The deterministic half of the loop and the optimizer baseline run end to end, co
 unit tests. The locked split groups the catalog into 456 families by crystal system and average
 connectivity $Z$. Families with more than 200 lattices always go to training, and the rest are
 split within each crystal system into 13,295, 2,039 and 1,928 lattices in 325, 67 and 64 families.
-Trained for 100 epochs on the full training split, the default model (four message-passing layers
+Of the 17,262 records split, the 17,222 with stiffness data are used (7 validation records lack it). Trained for 100 epochs on the full training split, the default model (four message-passing layers
 of width 128) took about 1.5\,h on a laptop CPU (\texttt{runs/main-full}, Fig.~\ref{fig:runs}a).
 Its validation loss, still falling at the end, reached 0.112 at epoch 97. On 2,032 validation lattices in 67 families, $R^2$ is 0.89--0.93 for the
 moduli and 0.83--0.85 for the couplings, with median errors of 25--39\% and 0.041--0.048. However,
-194 of these predictions (9.5\%) are not positive definite, whereas every FE stiffness in the
-catalog is, so the violations come from the model and are the failure the planned PD output layer
-targets. On a 2,000-lattice subset (\texttt{runs/main-2000}), the same model reached a validation
-loss of 0.223, median modulus errors of 54--62\% and 7.9\% non-PD predictions on 239 validation
-lattices. About eight times more data thus roughly halved the error, but it did not reduce the
-share of invalid predictions.
+194 of these predictions (9.5\%) are not positive definite, whereas all 2,032 FE labels are (the
+catalog's four non-PD labels all lie in the training set), so the violations come from the model
+and are the failure the planned PD output layer targets. On a 2,000-lattice subset drawn from the
+same split (\texttt{runs/main-2000}), the same model reached a validation loss of 0.223, median
+modulus errors of 54--62\% and 7.9\% non-PD predictions on 239 of the validation lattices. About
+eight times more data thus roughly halved the error, but it did not reduce the share of invalid
+predictions; this is an observation, not a controlled scaling study.
 
-One Optuna study on the same subset (\texttt{runs/optuna-2000}), over the learning rate, weight
-decay, width, depth, batch size and augmentation, stopped after 13 of its 20 runs (about 2\,h)
-because ten runs in a row brought no improvement (Fig.~\ref{fig:runs}b). Its best run reached a
-validation loss of 0.224, no better than the untuned run, with 10\% non-PD predictions. One run had
-no non-PD predictions but a median modulus error of 334\%, so the non-PD rate only means something
-together with the error. Tuning alone therefore did not lower the held-out error on the subset,
+One exploratory Optuna study on the subset (\texttt{runs/optuna-2000}), over six settings,
+stopped after 13 of 20 runs (about 2\,h) because ten in a row brought no improvement (Fig.~\ref{fig:runs}b). Its best run reached a
+validation loss of 0.224, no better than the untuned run, with 10\% non-PD predictions. Tuning alone therefore did not lower the held-out error on the subset,
 which is where a diagnosis could add something, although a single study with one seed cannot
 settle this.
 
@@ -190,21 +186,22 @@ On 25 questions written before any chunk existed, 19 of them answerable from the
 answer) was only 0.26--0.37 across embedding, hybrid and keyword search. The misses
 share a cause: author names appear only in page headers and reference lists, so questions that name
 a paper retrieve its bibliography, and paraphrases that span several papers match no single chunk.
-The agent did, however, decline all six questions whose answer is not in the corpus. The retriever
-is therefore usable with the citation check and a hand check of each page citation, but not yet
-reliable enough to rebuild A2 on its own.
+The agent did, however, decline all six questions whose answer is not in the corpus, and I still
+check each page citation by hand.
 
 \section*{D \quad Evaluation}
 
 \subsection*{D1 \quad LLM-free check and success}
-\textbf{Physical validity.} Code assembles the $6\times6$ stiffness matrix of every prediction and
-checks that it is positive definite, so that any strain stores positive energy. Because the
-predicted moduli are positive by construction, this reduces to checking the smallest eigenvalue of
-a $3\times3$ matrix built from the Poisson couplings. Its threshold, $3.6\times10^{-7}$, is the
-largest shift that single-precision rounding can cause.
-\textbf{Success.} The agent succeeds if, at the same 20-run budget, its final model has a lower
-error on the 64 locked test families than the baseline's, by more than the spread across three
-repeats. The test families are used once, at the end. I also report the non-PD rate and the runs
+\textbf{Physical validity.} Every predicted stiffness must be positive definite, so that any strain
+stores positive energy. The couplings are the symmetric terms $c_{ij}=\nu_{ij}\sqrt{E_j/E_i}$ and the
+moduli are positive, so the stiffness is positive definite exactly when the $3\times3$ block with
+unit diagonal and $-c_{ij}$ off it is. Code checks that block's smallest eigenvalue against an
+absolute tolerance of $3.6\times10^{-7}$, which is scale-free because the diagonal is one and bounds
+the shift from rounding the couplings to single precision (derivation in \texttt{evaluate.py}).
+\textbf{Success.} After exactly 20 training runs each, the agent's final model must have a lower
+standardized MSE over the 64 locked test families (the optimizer's loss; median errors and the
+non-PD rate are secondary) than the baseline's, by more than the spread across three repeats. Each
+repeat's final model is its best validation run, and the test families are used once, at the end. I also report the non-PD rate and the runs
 needed to reach the target defined below, and each escalation counts as not solved, so declining
 cannot raise the score. To test the diagnosis itself, I plant three failures with known causes
 (no PD output layer, a learning-rate range that excludes good values, and corrupted labels in one
@@ -212,15 +209,13 @@ family) and record whether the agent names the correct remedy.
 \textbf{Thresholds.} The non-PD target is zero, because any non-PD prediction is physically
 invalid. No specification fixes an acceptable error for the moduli, so I set no accuracy target by
 eye. Instead, the target for counting runs is the best validation error the baseline reaches, and
-studies stop when the budget is used or progress stalls. The precision of the catalog labels
-(three significant figures for the moduli, three decimals for the couplings) is a floor on the
-error, not a target.
+every study uses its full budget. The catalog labels are rounded to three significant figures for
+the moduli and three decimals for the couplings, which limits their resolution but is not a target.
 \textbf{Checking each decision.} After each decision, code checks whether the next round lowered
 the error of the targeted families and the non-PD rate, and whether a structural change had the
 effect the agent predicted, and it logs both. Because the error also varies by chance, a drop
-counts only if it exceeds the spread between runs with different seeds. Separately, I will validate
-selected predictions of the surrogate by hand with Abaqus FE simulations, which checks the model
-and the labels rather than the agent's decisions.
+counts only if it exceeds the spread between runs with different seeds. Separately, Abaqus FE
+simulations of selected lattices check the surrogate and the labels, not the decisions.
 \textbf{Agent variability.} I pin the model ID and effort level, but \texttt{claude -p} cannot
 set the temperature, so I seed training and Optuna and repeat each decision on the same frozen
 reports about ten times.
@@ -228,10 +223,11 @@ reports about ten times.
 \subsection*{D2 \quad Baseline}
 The baseline is Optuna alone, with the same tools, 20-run budget, locked test families and three
 repeats. It treats each menu option as an on/off setting, so it can try combinations of structural
-changes from the start, whereas the agent adds one change per decision and keeps it. Because the
-baseline can reach every menu option the agent can, any advantage of the agent must come from its
-diagnosis, for example reaching a good model in fewer runs. Results that depend on an off-menu
-change, which only the agent can propose by escalating to me, are reported separately.
+changes from the start, whereas the agent adds one change per decision and keeps it. The baseline can reach every menu option the agent can, but the two
+still search differently, so a gain may come from the stepwise, history-dependent search rather
+than from the LLM's diagnosis. This is a limitation of the comparison; the planted failures test
+the diagnosis directly. Results that depend on an off-menu change, which only the agent can
+propose by escalating to me, are reported separately.
 
 \section*{E \quad Plan and risks}
 
@@ -257,12 +253,12 @@ locked split frozen; the four loop tools built and tested; the first real traini
 study; the success criteria fixed; Labs 4 and 5 built into the literature agent.
 \textbf{Remaining:} the menu switches, the validator, the agent, the loop and the evaluation
 harness; explaining the 257 $Z_\text{avg}$ mismatches and the 4 non-PD labels.
-\textbf{Bottleneck:} CPU time for the full-catalog studies (E2). \textbf{Maintenance:} 26 commits
+\textbf{Bottleneck:} CPU time for the full-catalog studies (E2). \textbf{Maintenance:} 27 commits
 since 9 October and dated \texttt{LOG.md} entries for 18 and 29--31 October.
 
 \section*{AI usage disclosure}
 \textbf{Tools.} Claude Code (\texttt{claude-opus-5-5}, version 2.1.307) built this project under my
-direction: it wrote the code, tests and figure scripts (24 of 26 commits carry its co-author line)
+direction: it wrote the code, tests and figure scripts (25 of 27 commits carry its co-author line)
 and drafted this report from \texttt{LOG.md} and my design worksheet. An earlier literature agent
 (\texttt{claude-sonnet-5-5}) searched for related papers in two runs (\texttt{literature\_review/}).
 For Labs 4 and 5, Claude Code drafted the permissions, the index change, the evaluation runs and
@@ -272,7 +268,7 @@ commit. Every number in this report comes from a logged run (\texttt{runs/} or
 \texttt{capstone-agent/eval/}) or a cited paper. I read every cited paper and checked each cited page
 against its PDF.
 
-\begin{thebibliography}{3}\footnotesize\setlength{\itemsep}{0pt}
+\begin{thebibliography}{9}\footnotesize\setlength{\itemsep}{0pt}
 \bibitem{lumpe} T.~S. Lumpe, T.~Stankovi\'c. Exploring the property space of periodic cellular
   structures based on crystal networks. \emph{PNAS} 118(7), 2021. doi:10.1073/pnas.2003504118.
 \bibitem{indurkar} P.~P. Indurkar, S.~Karlapati, A.~J.~D. Shaikeea, V.~S. Deshpande. Predicting

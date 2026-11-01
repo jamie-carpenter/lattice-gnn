@@ -134,7 +134,8 @@ Stopping (checked by code, not the agent; decided 2026-11-01):
   - success: no accuracy target from a spec, so accuracy thresholds are 0 (never met);
     non-PD target is 0
   - budget: 20 training runs used
-  - no progress: 10 runs in a row without a new best (config/loop.yaml)
+  - no progress: off for the agent-vs-baseline studies, so both use all 20 runs
+    (2026-11-01, after the external review); only for exploratory studies
   - cap of <3> structural changes
 
 Escalation:
@@ -321,8 +322,13 @@ Held-out tasks (which families / targets; frozen before development):
 Repeats per condition: 3 (budget, section 11)   Model ID: claude-sonnet-5-5
 Temperature: CLI default, not settable in claude -p   Effort: pinned via --effort
 
-Success (primary, comparative): the agent beats the baseline on locked test error by more
-  than the spread across repeats. No absolute accuracy target (section 9).
+Success (primary, comparative): after exactly 20 training runs each, the agent beats the
+  baseline on locked test error by more than the spread across repeats. Primary metric:
+  standardized MSE over all test lattices (the optimizer's loss); median errors and non-PD
+  rate secondary. Each repeat's final model is its best validation run; test used once.
+  No absolute accuracy target (section 9). Limitation: agent (stepwise) and baseline
+  (combinations) search differently, so a gain may come from the search order rather than
+  the diagnosis; planted failures test the diagnosis directly (2026-11-01).
 
 Metrics (agent vs baseline):
   - error on the locked test families at the end of the budget
@@ -345,7 +351,7 @@ How abstention / escalation is scored: an escalation counts as "not solved".
 |-------|-----------|--------------|
 | Non-PD rate | 0 | Any non-PD prediction is physically invalid |
 | Positive definiteness | smallest eigenvalue of the normalized 3x3 block > 3·eps32 (3.6e-7) | Sylvester + Weyl bound on float32 rounding; comment in `lattice_gnn/evaluate.py` |
-| "Target met" accuracy | none: thresholds 0 in `config/loop.yaml`, so studies stop on budget or no progress; runs-to-target uses the baseline's best validation error (2026-11-01) | No downstream spec. Only derived number is the label-precision floor: moduli printed to 3 significant figures (~0.5 %), couplings to 3 decimals (±0.0005). A floor, not a target. Primary success is comparative (section 8). |
+| "Target met" accuracy | none: thresholds 0 in `config/loop.yaml`, so studies use their full budget; runs-to-target uses the baseline's best validation error (2026-11-01) | No downstream spec. Only derived number is the label resolution: moduli printed to 3 significant figures (~0.5 %), couplings to 3 decimals (±0.0005). Limits resolution; not a target. Primary success is comparative (section 8). |
 | Data sanity | 257 Z_avg mismatches and 4 non-PD labels listed and excluded | LOG.md 2026-10-29 |
 
 ---
