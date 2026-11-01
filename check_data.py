@@ -1,7 +1,8 @@
 """Sanity-check a lattice data file before training.
 
 For every record: parse it, build the periodic graph, and check that
-  - the graph's average connectivity matches the Z_avg reported in the file,
+  - the graph's average connectivity matches the Z_avg reported in the file (computed
+    with the catalog's convention, PeriodicGraph.catalog_z_avg),
   - the Poisson's ratios satisfy nu_ij / E_i == nu_ji / E_j (up to rounding),
   - the resulting stiffness matrix is positive definite.
 
@@ -33,7 +34,7 @@ def main():
                 "No properties (can't train on)": []}
     for n, lat in enumerate(lattices):
         g = build_periodic_graph(lat)
-        z_ok = lat.z_avg is None or abs(g.z_avg - lat.z_avg) < 0.01
+        z_ok = lat.z_avg is None or abs(g.catalog_z_avg() - lat.z_avg) < 0.01
         if not z_ok:
             problems["Z_avg mismatch"].append(lat.name)
         if lat.props is None:
@@ -49,7 +50,8 @@ def main():
             print(f"  nodes {len(lat.nodes)} -> {len(g.frac)} unique, "
                   f"bars {len(lat.bars)} -> {len(g.edges)} unique")
             file_z = "not given" if lat.z_avg is None else f"{lat.z_avg:.2f}"
-            print(f"  Z_avg graph {g.z_avg:.2f}, file {file_z}  {'OK' if z_ok else 'MISMATCH'}")
+            print(f"  Z_avg graph {g.catalog_z_avg():.2f} (true average degree {g.z_avg:.2f}), "
+                  f"file {file_z}  {'OK' if z_ok else 'MISMATCH'}")
             if lat.props is not None:
                 # Round-trip through the training targets, so this shows what the model's
                 # predictions look like once converted back to the file's properties.

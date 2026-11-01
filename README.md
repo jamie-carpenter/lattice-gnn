@@ -1,6 +1,23 @@
 # lattice-gnn
 This contains the code used to develop a GNN to predict the elastic tensor of lattice structures.
 
+## GNN pipeline and optimizer baseline
+
+Setup: `python -m venv .venv`, then `.venv/Scripts/python -m pip install -r requirements.txt`.
+
+- Subset: `python scripts/make_subset.py Unit_Cell_Catalog/Unit_Cell_Catalog.txt data/raw/subset_2000.txt --n 2000`
+  (every k-th complete record of the catalog).
+- Locked split: `splits/main.json` (frozen; see `lattice_gnn/splits.py`).
+- One training run: `python train.py data/raw/subset_2000.txt --split-file splits/main.json --epochs 100 --run-id <id>`
+  writes `runs/<id>/` (config, split, model, history, `eval.json`).
+- Evaluate on validation (`eval.json`) or, once, on the locked test set: `python -m lattice_gnn.evaluate runs/<id> [--part test]`.
+- Optuna baseline: `python -m lattice_gnn.optimize --config config/loop.yaml --study <name>`
+  (`--runs 6 --epochs 5` for a quick check).
+- Readable report of a run: `python -m lattice_gnn.report runs/<id>`.
+- Tests: `python -m pytest tests`.
+
+Design: `docs/agent_design_worksheet.md`; build order: `docs/TODO.md`; running log: `LOG.md`.
+
 ## Literature-review agent (Claude Code)
 
 Runs in Claude Code with your Claude sign-in (no API key). Setup, once per machine:

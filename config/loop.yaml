@@ -1,0 +1,43 @@
+# Settings for the optimizer baseline (lattice_gnn.optimize) and, later, the agent loop.
+# Every training run in a study uses the same data, split and fixed settings; only the
+# `search` and `menu` entries vary.
+
+data:
+  paths: [Unit_Cell_Catalog/Unit_Cell_Catalog.txt]   # full catalog; studies used to run on data/raw/subset_2000.txt
+  split_file: splits/main.json        # frozen once: python -m lattice_gnn.splits
+
+training:          # fixed for every run (any key of lattice_gnn.training.DEFAULTS)
+  epochs: 100
+  patience: 20
+  seed: 0
+
+# Hyperparameter ranges. float/int: low, high, optional log; categorical: choices.
+search:
+  lr:           {type: float, low: 1.0e-4, high: 3.0e-3, log: true}
+  weight_decay: {type: float, low: 1.0e-7, high: 1.0e-3, log: true}
+  hidden:       {type: categorical, choices: [64, 128, 256]}
+  layers:       {type: int, low: 2, high: 6}
+  batch_size:   {type: categorical, choices: [32, 64, 128]}
+
+# Structural menu: each option is a categorical setting the optimizer may switch.
+# TODO section 7 adds pd_head, physics_residual and family_balanced_loss here once
+# training supports them.
+menu:
+  augment: [true, false]
+
+optimizer:
+  sampler_seed: 0
+  objective: loss     # loss | median_percent_error_moduli | median_abs_error_couplings | non_pd_rate
+
+budget:
+  runs: 20            # training runs per study (3 repeats x 2 conditions, worksheet section 11)
+  # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
+  #                   # and baseline always use the full budget; set it only for exploratory studies.
+
+# Stop early only if every threshold is met on the validation families.
+# No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy
+# thresholds are 0 and never met: studies stop on budget or no progress. Non-PD target is 0.
+thresholds:
+  median_percent_error_moduli: 0.0
+  median_abs_error_couplings: 0.0
+  non_pd_rate: 0.0
