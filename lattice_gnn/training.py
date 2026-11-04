@@ -42,6 +42,7 @@ DEFAULTS = {
     "layers": 4,             # number of message-passing layers
     "patience": 40,          # stop if validation loss hasn't improved for this many epochs
     "augment": True,         # axis-swap augmentation
+    "pd_head": False,        # couplings always give a positive definite stiffness (model.pd_couplings)
     "seed": 0,
     "runs_dir": "runs",
     "run_id": None,          # default: timestamp + random suffix
@@ -105,7 +106,7 @@ def train(config: dict, graphs=None) -> str:
     first = train_set[0]
     model = LatticeGNN(node_dim=first.x.size(1), edge_dim=first.edge_attr.size(1),
                        global_dim=first.u.size(1), out_dim=first.y.size(1),
-                       hidden=config["hidden"], layers=config["layers"])
+                       hidden=config["hidden"], layers=config["layers"], pd_head=config["pd_head"])
     model.fit_normalizers(train_set)
     log(f"Model: {sum(p.numel() for p in model.parameters()):,} parameters\n")
 

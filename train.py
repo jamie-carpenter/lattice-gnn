@@ -40,6 +40,8 @@ def main():
     parser.add_argument("--patience", type=int, default=d["patience"],
                         help="stop if validation loss hasn't improved for this many epochs")
     parser.add_argument("--no-augment", action="store_true", help="turn off axis-swap augmentation")
+    parser.add_argument("--pd-head", action="store_true",
+                        help="predict couplings that always give a positive definite stiffness")
     parser.add_argument("--seed", type=int, default=d["seed"])
     parser.add_argument("--rebuild", action="store_true", help="re-parse data files, ignoring the cache")
     parser.add_argument("--runs-dir", default=d["runs_dir"])
