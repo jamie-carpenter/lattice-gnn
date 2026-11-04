@@ -20,10 +20,11 @@ search:
   batch_size:   {type: categorical, choices: [32, 64, 128]}
 
 # Structural menu: each option is a categorical setting the optimizer may switch.
-# TODO section 7 adds pd_head, physics_residual and family_balanced_loss here once
-# training supports them.
+# TODO section 7 adds physics_residual and family_balanced_loss here once training
+# supports them.
 menu:
   augment: [true, false]
+  pd_head: [false, true]    # positive definite by construction (lattice_gnn.model.pd_couplings)
 
 optimizer:
   sampler_seed: 0

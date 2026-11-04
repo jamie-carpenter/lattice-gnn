@@ -1,5 +1,24 @@
 # Running log
 
+## 2026-11-04
+
+**Done**
+- `pd_head` switch (TODO section 7): `LatticeGNN(pd_head=True)`, `train(config)` key `pd_head`,
+  `train.py --pd-head`, and `pd_head: [false, true]` in the `config/loop.yaml` menu.
+  - The 3 coupling outputs are mapped through canonical partial correlations (tanh) to a
+    correlation matrix R = L L^T, then (1 - 1e-5) R + 1e-5 I, so the normalized compliance
+    block is positive definite for every input, and every PD block can still be reached.
+  - Margin 1e-5: on the full catalog the labels' smallest block eigenvalue has median 0.037,
+    1st percentile 0.002, and only 4 of 17,222 labels are below 1e-4.
+  - `tests/test_pd_head.py`: 0 non-PD on random and extreme inputs, finite gradients when
+    saturated, inversion on random PD blocks, save/load, a short `train` run. 22 tests pass.
+  - Check on `subset_300.txt`, `splits/main.json`, 30 epochs: non-PD 0 / 40 with the head,
+    2 / 40 without; validation loss 0.632 vs 0.651 (too small a set to compare accuracy).
+
+**Remaining**
+- A `pd_head` run on the full catalog, to compare with `main-full` (9.5% non-PD).
+- `validate.py` and the diagnostician (Lab Report 3).
+
 ## 2026-11-01
 
 **Done**

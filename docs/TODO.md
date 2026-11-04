@@ -70,9 +70,10 @@ Design: `docs/agent_design_worksheet.md`.
 ## 7. Menu config and switches
 
 - [ ] `config/loop.yaml`: menu options, hyperparameter ranges, thresholds, budget
-- [ ] Switch 1 `pd_head`: predict couplings so the 3x3 normalized compliance block is always
+- [x] Switch 1 `pd_head`: predict couplings so the 3x3 normalized compliance block is always
       positive definite (e.g. Cholesky-style); add to `LatticeGNN`
-- [ ] Test: with `pd_head` on, PD failures are 0 on any input
+      (`model.pd_couplings`: partial correlations -> correlation matrix, margin 1e-5)
+- [x] Test: with `pd_head` on, PD failures are 0 on any input (`tests/test_pd_head.py`)
 - [ ] Switch 2 `physics_residual`: compute a stretch-only stiffness estimate from bar
       n⊗n terms; model predicts log10(true / estimate)
 - [ ] Switch 3 `family_balanced_loss`: weight samples by 1 / family size
