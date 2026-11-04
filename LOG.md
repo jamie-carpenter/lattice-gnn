@@ -15,9 +15,23 @@
   - Check on `subset_300.txt`, `splits/main.json`, 30 epochs: non-PD 0 / 40 with the head,
     2 / 40 without; validation loss 0.632 vs 0.651 (too small a set to compare accuracy).
 
+- Agent output schema and validator (TODO section 9), `lattice_gnn/validate.py`:
+  - `DECISION_SCHEMA`: `decision`, `reason`, `evidence`, plus `ranges` (retune),
+    `menu_option` + `prediction` (change_structure) or `would_try` (escalate). Which fields each
+    decision needs is checked in code, so the schema has no conditionals for `claude -p`.
+  - `validate(decision, state) -> {ok, errors, force_escalate}`. Rules: well-formed; retune
+    ranges inside `limits`; menu option on the menu, a real change, under the cap of 3
+    structural changes; enough budget for a round of 5 runs. Proposing an option that already
+    failed forces escalation (no retry). Escalate is always allowed if well-formed.
+  - `config/loop.yaml`: new `limits` (hard bounds on the agent's ranges, wider than `search`),
+    `budget.round_runs: 5`, `budget.max_structural_changes: 3`. `jsonschema` pinned.
+  - `tests/test_validate.py`: 37 tests, at least one per rule; 59 tests pass in total.
+- Started `runs/main-full-pd`: `main-full`'s settings plus `--pd-head`.
+
 **Remaining**
-- A `pd_head` run on the full catalog, to compare with `main-full` (9.5% non-PD).
-- `validate.py` and the diagnostician (Lab Report 3).
+- Compare `main-full-pd` with `main-full` (9.5% non-PD).
+- Check the `limits` values (proposed, not yet decided).
+- The diagnostician: agent spec, input file, one `claude -p` call (Lab Report 3).
 
 ## 2026-11-01
 

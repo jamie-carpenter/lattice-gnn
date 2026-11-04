@@ -90,10 +90,11 @@ Design: `docs/agent_design_worksheet.md`.
 
 ## 9. Agent
 
-- [ ] Output schema (JSON): `decision` (retune | change_structure | escalate), `reason`,
+- [x] Output schema (JSON): `decision` (retune | change_structure | escalate), `reason`,
       `evidence`, plus `ranges` / `menu_option` + `prediction` depending on the decision
-- [ ] `lattice_gnn/validate.py`: reject options not on the menu or already failed, ranges out
-      of limits, over budget; unit tests for each rule
+      (`validate.DECISION_SCHEMA`; also `would_try` for escalate)
+- [x] `lattice_gnn/validate.py`: reject options not on the menu or already failed, ranges out
+      of limits, over budget; unit tests for each rule (`tests/test_validate.py`)
 - [ ] Agent spec `.claude/agents/diagnostician.md`: role, inputs, options, schema, pinned model,
       no shell / no file edits
 - [ ] Build the agent's input: `eval.json` + trial history + decision log -> one prompt file

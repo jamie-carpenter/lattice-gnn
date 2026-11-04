@@ -19,6 +19,16 @@ search:
   layers:       {type: int, low: 2, high: 6}
   batch_size:   {type: categorical, choices: [32, 64, 128]}
 
+# Hard limits on the agent's retune ranges (lattice_gnn.validate): wider than `search`, so a
+# retune can move outside the starting ranges (e.g. the planted failure where `search` excludes
+# good learning rates), but never to absurd values. float/int: low, high; categorical: choices.
+limits:
+  lr:           {low: 1.0e-5, high: 1.0e-1}
+  weight_decay: {low: 1.0e-9, high: 1.0e-1}
+  hidden:       {choices: [32, 64, 128, 256, 512]}
+  layers:       {low: 1, high: 8}
+  batch_size:   {choices: [16, 32, 64, 128, 256]}
+
 # Structural menu: each option is a categorical setting the optimizer may switch.
 # TODO section 7 adds physics_residual and family_balanced_loss here once training
 # supports them.
@@ -32,6 +42,8 @@ optimizer:
 
 budget:
   runs: 20            # training runs per study (3 repeats x 2 conditions, worksheet section 11)
+  round_runs: 5       # agent loop: Optuna runs per round, between agent decisions (worksheet section 6)
+  max_structural_changes: 3   # agent loop: then it must escalate (worksheet section 3)
   # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
   #                   # and baseline always use the full budget; set it only for exploratory studies.
 
