@@ -175,7 +175,7 @@ Stochasticity:
   reports ~10 times each and counting the outcomes.
   Temperature: `claude -p` has no temperature setting (checked on Claude Code 2.1.307), so it
   stays at the CLI default; consistency is measured by the repeated calls above. The model
-  ID and the --effort level are pinned (2026-11-01; effort level still to choose).
+  ID and the --effort level are pinned (2026-11-01); effort level high (Jamie, 2026-11-05).
 ```
 
 ---

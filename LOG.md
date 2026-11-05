@@ -1,5 +1,36 @@
 # Running log
 
+## 2026-11-05
+
+**Done**
+- Diagnostician effort level: high (Jamie). Pinned with the model in the new `agent` section of
+  `config/loop.yaml` (`claude-sonnet-5-5`, effort high, 3 turns, 1 retry).
+- Diagnostician (TODO section 9): `.claude/agents/diagnostician.md` (no tools) and
+  `python -m agents.diagnostician <run or study folder>`. It writes the input (state, eval.json
+  with the run's settings, optimizer history, decision log) to `agent/prompt-<n>.md`, calls
+  `claude -p` with `--json-schema`, validates with `lattice_gnn.validate`, retries once with the
+  errors, then forces an escalation. Logs `decisions.jsonl` and `run_info.json` (model requested
+  and used, Claude Code version, effort, tokens, cost estimate). `tests/test_diagnostician.py`
+  uses a fake `claude`; 66 tests pass.
+- Fix: Claude Code rejects a `$schema` key for draft 2020-12, so `DECISION_SCHEMA` has none.
+- First real decision, on `runs/main-full` (not committed): valid on the first call; 9.5 s,
+  2 turns, 11,161 input tokens (cache creation) and 1,156 output, $0.056 client estimate,
+  model used `claude-sonnet-5-5`, Claude Code 2.1.316.
+  - Decision: change_structure, `pd_head` = true. Reason: 194 / 2,032 non-PD with 0 non-PD
+    labels, spread across families; `augment` already on.
+  - Prediction: non-PD 194 -> 0 in every family; coupling error (0.046) about the same or
+    slightly better; moduli error (30.8%) within a few points; failed if non-PD > 0 or coupling
+    error rises by > 0.02.
+  - Checked against `runs/main-full-pd` (2026-11-04): non-PD 0, couplings 0.042, moduli 28.5%.
+    The prediction holds; one seed, and the run existed before the decision.
+  - One wrong number in its evidence: "15 of 20 runs remain" (19 remain after 1 run). The
+    validator checks the budget itself, so this did not matter here, but evidence text is not
+    checked.
+
+**Remaining**
+- The loop (TODO section 10): orchestrator, human gate, stopping rules, one command.
+- Decision consistency on frozen reports (TODO section 11), e.g. `main-full` x 10 calls.
+
 ## 2026-11-04
 
 **Done**
@@ -26,10 +57,21 @@
   - `config/loop.yaml`: new `limits` (hard bounds on the agent's ranges, wider than `search`),
     `budget.round_runs: 5`, `budget.max_structural_changes: 3`. `jsonschema` pinned.
   - `tests/test_validate.py`: 37 tests, at least one per rule; 59 tests pass in total.
-- Started `runs/main-full-pd`: `main-full`'s settings plus `--pd-head`.
+- `runs/main-full-pd` (not committed): `main-full`'s settings plus `--pd-head`, ~1.5 h,
+  `python train.py Unit_Cell_Catalog/Unit_Cell_Catalog.txt --split-file splits/main.json --epochs 100 --patience 40 --pd-head --run-id main-full-pd`.
+  Same 2,032 validation lattices in 67 families as `main-full`.
+  - Non-PD predictions: 0 / 2,032 (`main-full`: 194, 9.5%).
+  - Best epoch 99 (`main-full`: 97); validation loss 0.110 (0.112); both still falling at 100.
+  - Median error over the moduli 28.5% (30.8%), over the couplings 0.042 (0.046). Per target:
+    Gxy 31.0% (38.8%), Gxz 31.0% (34.3%); Ey 25.8% (24.8%) is the one modulus slightly worse.
+    R² 0.89-0.93 on the moduli, 0.83-0.84 on the couplings (same ranges as `main-full`).
+  - The 5 families with the most non-PD in `main-full` (15-25 each): 0 non-PD, coupling error
+    equal or lower in 4 of 5.
+  - One seed each: the accuracy differences are within what seed-to-seed spread may explain
+    (not measured yet). The non-PD result holds by construction.
 
 **Remaining**
-- Compare `main-full-pd` with `main-full` (9.5% non-PD).
+- Seed spread for the full-catalog runs (needed anyway to judge the agent's decisions).
 - Check the `limits` values (proposed, not yet decided).
 - The diagnostician: agent spec, input file, one `claude -p` call (Lab Report 3).
 

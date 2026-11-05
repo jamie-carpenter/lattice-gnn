@@ -53,8 +53,9 @@ _RANGE = {
 
 # Conditional fields (which decision needs which) are checked in code, not with if/then, so the
 # same schema can be passed to `claude -p --json-schema` without relying on conditional support.
+# No "$schema" key: Claude Code's checker rejects the draft 2020-12 URI. Only keywords that mean
+# the same in draft-07 and 2020-12 are used, and validate() names its draft explicitly.
 DECISION_SCHEMA = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
         "decision": {"enum": list(DECISIONS)},

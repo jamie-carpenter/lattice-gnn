@@ -54,3 +54,11 @@ thresholds:
   median_percent_error_moduli: 0.0
   median_abs_error_couplings: 0.0
   non_pd_rate: 0.0
+
+# The diagnostician (agents/diagnostician): one claude -p call per decision, no tools.
+agent:
+  name: diagnostician          # .claude/agents/diagnostician.md
+  model: claude-sonnet-5-5     # pinned (agent_design_worksheet.md section 5)
+  effort: high                 # decided 2026-11-05 (Jamie)
+  max_turns: 3
+  retries: 1                   # invalid output: one retry with the errors, then forced escalate

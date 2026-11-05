@@ -95,12 +95,13 @@ Design: `docs/agent_design_worksheet.md`.
       (`validate.DECISION_SCHEMA`; also `would_try` for escalate)
 - [x] `lattice_gnn/validate.py`: reject options not on the menu or already failed, ranges out
       of limits, over budget; unit tests for each rule (`tests/test_validate.py`)
-- [ ] Agent spec `.claude/agents/diagnostician.md`: role, inputs, options, schema, pinned model,
-      no shell / no file edits
-- [ ] Build the agent's input: `eval.json` + trial history + decision log -> one prompt file
-- [ ] Call the agent once on a saved report via `claude -p`; parse and validate its output
-- [ ] Decision log: append each decision + outcome to `runs/<id>/decisions.jsonl`
-- [ ] Record model ID, Claude Code version, tokens per call in `runs/<id>/run_info.json`
+- [x] Agent spec `.claude/agents/diagnostician.md`: role, inputs, options, schema, pinned model,
+      no shell / no file edits (no tools at all: `--tools ""`)
+- [x] Build the agent's input: `eval.json` + trial history + decision log -> one prompt file
+- [x] Call the agent once on a saved report via `claude -p`; parse and validate its output
+      (`python -m agents.diagnostician runs/main-full`, 2026-11-05)
+- [x] Decision log: append each decision + outcome to `runs/<id>/decisions.jsonl`
+- [x] Record model ID, Claude Code version, tokens per call in `runs/<id>/run_info.json`
 
 ## 10. The loop
 
@@ -109,7 +110,7 @@ Design: `docs/agent_design_worksheet.md`.
 - [ ] Human gate: pause for approval on `change_structure` and `escalate`
 - [ ] Stopping rules from `config/loop.yaml` (success, budget, no progress, max 3 structural
       changes)
-- [ ] Retry once on invalid agent output, then force escalate
+- [x] Retry once on invalid agent output, then force escalate (in `agents.diagnostician.decide`)
 - [ ] One command runs the whole loop: `python -m agents.diagnostician --config config/loop.yaml`
 
 ## 11. Evaluation harness
