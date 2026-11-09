@@ -289,6 +289,9 @@ Stopping conditions (all checkable by code): see Section 3.
 ```
 Approve before: every change_structure; any step beyond the run budget; unlocking the
   test set (used once, at the end).
+Unattended studies (Jamie, 2026-11-05): `--approve all`. Every change_structure is approved
+  automatically and an escalation stops the loop ("not solved"); refusing all would reduce the
+  agent to retuning. Interactive runs keep `--approve ask`.
 Review after: each round's decision log; the final comparison.
 Escalations the human handles: no menu option fits; suspected bad labels; agent output
   failed the schema twice; agent repeated an option that already failed.

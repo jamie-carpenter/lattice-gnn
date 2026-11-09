@@ -27,8 +27,44 @@
     validator checks the budget itself, so this did not matter here, but evidence text is not
     checked.
 
+- The loop (TODO section 10), `agents/diagnostician/loop.py`:
+  `python -m agents.diagnostician.loop --config config/loop.yaml --name <name> [--approve ask|all|none]`.
+  - Each round: Optuna runs 5 training runs over the current search ranges with the structure
+    fixed (the optimizer never sets menu switches here, only the agent does); a new Optuna study
+    per round, sampler seed + round. Then check_target, one agent decision, the human gate, apply.
+  - Human gate: retunes run without approval; `ask` asks at the terminal for every
+    change_structure and on escalation (continue or stop). `all` / `none` approve / refuse every
+    change_structure unattended, and stop on escalation (counts as not solved).
+  - After the next round, code fills in the decision's `outcome` (improved | failed): the round's
+    best run against the best before it, beyond `outcome.min_loss_drop` (objective) or
+    `outcome.min_non_pd_drop`. Both are placeholders (0) until the seed spread is known.
+  - Writes `runs/<name>/`: loop.json, round-<r>/trial-<n>/, trials.json, decisions.jsonl,
+    run_info.json, agent/, summary.json.
+  - `tests/test_loop.py`: 6 end-to-end tests on the sample file with a fake `claude` (retune,
+    structure change approved / refused, escalation stop / continue, failed option -> forced
+    escalation). 72 tests pass.
+- Human gate for the unattended studies: `--approve all` (Jamie); recorded in the worksheet,
+  section 7.
+- Seed-spread runs: `runs/main-full-s1`, `runs/main-full-pd-s1` (seed 1, else as seed 0). Same
+  2,032 validation lattices:
+
+  | Run | Seed | Loss | Non-PD (rate) | Moduli median % error | Couplings median abs. error |
+  |---|---|---|---|---|---|
+  | main-full | 0 | 0.1119 | 194 (0.095) | 30.8 | 0.046 |
+  | main-full-s1 | 1 | 0.1239 | 110 (0.054) | 33.3 | 0.051 |
+  | main-full-pd | 0 | 0.1099 | 0 | 28.5 | 0.042 |
+  | main-full-pd-s1 | 1 | 0.1134 | 0 | 30.3 | 0.045 |
+
+  - Seed-to-seed gap in loss: 0.012 without pd_head, 0.0035 with it (pooled s.d. about 0.006).
+    Gap in non-PD rate without pd_head: 0.041.
+  - pd_head lowers the loss with both seeds (by 0.002 and 0.010; mean 0.006). That is inside the
+    seed spread, so two seeds do not establish an accuracy gain. The removal of non-PD
+    predictions is unambiguous (0 with both seeds).
+  - Every run is still improving at epoch 100 (best epochs 94-99).
+
 **Remaining**
-- The loop (TODO section 10): orchestrator, human gate, stopping rules, one command.
+- Seed spread -> `outcome` thresholds in `config/loop.yaml`.
+- `family_balanced_loss` on the menu before the studies start.
 - Decision consistency on frozen reports (TODO section 11), e.g. `main-full` x 10 calls.
 
 ## 2026-11-04

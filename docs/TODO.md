@@ -105,13 +105,17 @@ Design: `docs/agent_design_worksheet.md`.
 
 ## 10. The loop
 
-- [ ] Orchestrator (LangGraph or plain Python): optimize -> evaluate -> check -> agent ->
-      validate -> human gate -> apply -> repeat
-- [ ] Human gate: pause for approval on `change_structure` and `escalate`
-- [ ] Stopping rules from `config/loop.yaml` (success, budget, no progress, max 3 structural
+- [x] Orchestrator (LangGraph or plain Python): optimize -> evaluate -> check -> agent ->
+      validate -> human gate -> apply -> repeat (plain Python, `agents/diagnostician/loop.py`)
+- [x] Human gate: pause for approval on `change_structure` and `escalate` (`--approve ask`;
+      `all` / `none` for unattended runs, where an escalation stops the loop)
+- [x] Stopping rules from `config/loop.yaml` (success, budget, no progress, max 3 structural
       changes)
 - [x] Retry once on invalid agent output, then force escalate (in `agents.diagnostician.decide`)
-- [ ] One command runs the whole loop: `python -m agents.diagnostician --config config/loop.yaml`
+- [x] One command runs the whole loop:
+      `python -m agents.diagnostician.loop --config config/loop.yaml --name <name>`
+- [ ] Set `outcome.min_loss_drop` / `min_non_pd_drop` from the seed spread (placeholders 0)
+- [x] Decide the human gate for the unattended studies: `--approve all` (2026-11-05)
 
 ## 11. Evaluation harness
 

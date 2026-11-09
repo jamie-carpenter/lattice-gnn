@@ -47,6 +47,15 @@ budget:
   # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
   #                   # and baseline always use the full budget; set it only for exploratory studies.
 
+# Agent loop (agents/diagnostician/loop.py): after the round that follows a decision, it counts as
+# "improved" only if the round's best run beats the best before it by more than these amounts
+# (worksheet section 3: more than the seed-to-seed spread). From seeds 0 and 1 of main-full and
+# main-full-pd (LOG.md, 2026-11-05): loss gap 0.012 / 0.0035, non-PD rate gap 0.041. Rough
+# (two seeds per setup).
+outcome:
+  min_loss_drop: 0.01      # in the optimizer objective (standardized MSE)
+  min_non_pd_drop: 0.04    # in the non-PD rate
+
 # Stop early only if every threshold is met on the validation families.
 # No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy
 # thresholds are 0 and never met: studies stop on budget or no progress. Non-PD target is 0.

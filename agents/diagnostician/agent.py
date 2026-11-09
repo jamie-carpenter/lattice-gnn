@@ -55,10 +55,12 @@ def load_target(folder: Path) -> dict:
             "history": history, "runs_used": runs_used}
 
 
-def state_for(target: dict, loop: dict, decisions: list[dict]) -> dict:
-    """validate()'s state: structure from the best run's config, history from the decision log."""
-    config = {**DEFAULTS, **target["config"]}
-    structure = {name: config[name] for name in loop.get("menu", {})}
+def state_for(target: dict, loop: dict, decisions: list[dict], structure: dict | None = None) -> dict:
+    """validate()'s state: history from the decision log; structure given by the loop, else from
+    the best run's config (a single run, or before any structural change)."""
+    if structure is None:
+        config = {**DEFAULTS, **target["config"]}
+        structure = {name: config[name] for name in loop.get("menu", {})}
     applied = [d for d in decisions if d.get("approved") and not d.get("forced")]
     failed = []
     for d in decisions:
@@ -100,8 +102,9 @@ def build_prompt(target: dict, state: dict, loop: dict, decisions: list[dict]) -
                    "not an optimizer round.")
     else:
         history = {"objective": target["history"]["objective"], "best": target["history"]["best"],
-                   "trials": [{k: t[k] for k in ("number", "params", "value", "best_epoch", "overall",
-                                                 "non_pd_rate")} for t in target["history"]["trials"]]}
+                   "trials": [{k: t[k] for k in ("round", "number", "params", "value", "best_epoch",
+                                                 "overall", "non_pd_rate") if k in t}
+                              for t in target["history"]["trials"]]}
     log = [{k: d.get(k) for k in ("decision", "forced", "approved", "outcome")} for d in decisions] \
         or "None yet: this is the first decision."
     return "\n".join([
@@ -171,13 +174,17 @@ def parse_result(stdout: str) -> tuple[object, dict]:
 # ---------------------------------------------------------------- one decision
 
 def decide(folder: str | Path, loop: dict, claude: str = "claude", runner=run_claude,
-           prompt_only: bool = False) -> dict | None:
-    """Ask for one decision on `folder`, with up to agent.retries retries; returns the logged entry."""
+           prompt_only: bool = False, structure: dict | None = None) -> dict | None:
+    """Ask for one decision on `folder`, with up to agent.retries retries; returns the logged entry.
+
+    `loop["search"]` is shown as the current search ranges; the loop passes its retuned ranges
+    there, and the current structure in `structure`.
+    """
     folder = Path(folder)
     agent = loop["agent"]
     decisions = read_jsonl(folder / "decisions.jsonl")
     target = load_target(folder)
-    state = state_for(target, loop, decisions)
+    state = state_for(target, loop, decisions, structure)
     prompt = build_prompt(target, state, loop, decisions)
     out = folder / "agent"
     out.mkdir(exist_ok=True)
