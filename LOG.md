@@ -1,5 +1,47 @@
 # Running log
 
+## 2026-11-11
+
+**Done**
+- First agent-loop study, `runs/agent-pilot` (`--approve all`, 20 runs in 4 rounds of 5, 100 epochs,
+  outcome thresholds 0.01 / 0.04). Ran 5-11 Nov; slowed by Modern Standby on battery (training
+  pauses whenever the laptop is unplugged and the screen turns off).
+- Three agent decisions, all valid on the first call (2 turns, 11-13 s, about $0.07 each):
+
+  | After round | Decision | Outcome | Best loss before -> after |
+  |---|---|---|---|
+  | 0 | change_structure: pd_head on (non-PD 179 of 2,032) | improved | 0.129 -> 0.119; non-PD 0.088 -> 0 |
+  | 1 | retune: hidden {256, 512}, lr [3e-4, 2e-3], batch {32, 64} | improved | 0.119 -> 0.085 |
+  | 2 | retune: layers [5, 8], lr [2e-4, 1e-3] | failed (drop 0.0076 < 0.01) | 0.085 -> 0.077 |
+
+- Best run `round-3/trial-019` (hidden 256, 8 layers, lr 3.7e-4, wd 5.6e-4, batch 32), against
+  `main-full-pd` on the same 2,032 validation lattices:
+
+  | | main-full-pd | agent-pilot best |
+  |---|---|---|
+  | Loss | 0.110 | 0.077 |
+  | Non-PD | 0 | 0 |
+  | Moduli median % error | 28.5 | 21.0 |
+  | Ex / Ey / Ez % | 25.5 / 25.8 / 27.7 | 20.4 / 19.0 / 20.2 |
+  | Gyz / Gxz / Gxy % | 29.5 / 31.0 / 31.0 | 21.0 / 22.9 / 22.4 |
+  | Couplings median abs. error | 0.042 | 0.030 |
+
+- Observations for Lab Report 3:
+  - The agent's predictions for pd_head held (non-PD to 0, moduli little changed).
+  - Width 512: 4 of 5 runs diverged or trained badly (trials 11, 15, 17, 18; lr 4.9e-4 to
+    9.7e-4; loss about 0.82 or 0.24). The one good 512 run used lr 3.4e-4. The third decision's ranges allowed this; three of its five runs
+    were lost. The agent flagged its evidence for that decision as thin.
+  - Best epochs of the good runs are 92-100 of 100: the epoch cap still limits accuracy. The
+    agent noted that epochs are not a searchable setting.
+  - Small evidence slips: "10 runs remain, which is one full round of 5" (it is two rounds).
+  - The last outcome (0.0076 drop vs 0.01 threshold) lies within the seed spread either way.
+  - Single seed per run; the best run is the minimum of 20, so its loss is optimistically biased.
+
+**Remaining**
+- Retrain the best configuration with seeds 1-2 and a higher epoch cap; test-set evaluation.
+- Compare with the Optuna baseline at the same budget (TODO section 11).
+- Lab Report 3 (due 15 Nov).
+
 ## 2026-11-05
 
 **Done**
