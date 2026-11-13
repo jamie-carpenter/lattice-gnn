@@ -19,6 +19,16 @@ search:
   layers:       {type: int, low: 2, high: 6}
   batch_size:   {type: categorical, choices: [32, 64, 128]}
 
+# Hard limits on the agent's retune ranges (lattice_gnn.validate): wider than `search`, so a
+# retune can move outside the starting ranges (e.g. the planted failure where `search` excludes
+# good learning rates), but never to absurd values. float/int: low, high; categorical: choices.
+limits:
+  lr:           {low: 1.0e-5, high: 1.0e-1}
+  weight_decay: {low: 1.0e-9, high: 1.0e-1}
+  hidden:       {choices: [32, 64, 128, 256, 512]}
+  layers:       {low: 1, high: 8}
+  batch_size:   {choices: [16, 32, 64, 128, 256]}
+
 # Structural menu: each option is a categorical setting the optimizer may switch.
 # TODO section 7 adds physics_residual and family_balanced_loss here once training
 # supports them.
@@ -32,8 +42,19 @@ optimizer:
 
 budget:
   runs: 20            # training runs per study (3 repeats x 2 conditions, worksheet section 11)
+  round_runs: 5       # agent loop: Optuna runs per round, between agent decisions (worksheet section 6)
+  max_structural_changes: 3   # agent loop: then it must escalate (worksheet section 3)
   # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
   #                   # and baseline always use the full budget; set it only for exploratory studies.
+
+# Agent loop (agents/diagnostician/loop.py): after the round that follows a decision, it counts as
+# "improved" only if the round's best run beats the best before it by more than these amounts
+# (worksheet section 3: more than the seed-to-seed spread). From seeds 0 and 1 of main-full and
+# main-full-pd (LOG.md, 2026-11-05): loss gap 0.012 / 0.0035, non-PD rate gap 0.041. Rough
+# (two seeds per setup).
+outcome:
+  min_loss_drop: 0.01      # in the optimizer objective (standardized MSE)
+  min_non_pd_drop: 0.04    # in the non-PD rate
 
 # Stop early only if every threshold is met on the validation families.
 # No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy
@@ -42,3 +63,11 @@ thresholds:
   median_percent_error_moduli: 0.0
   median_abs_error_couplings: 0.0
   non_pd_rate: 0.0
+
+# The diagnostician (agents/diagnostician): one claude -p call per decision, no tools.
+agent:
+  name: diagnostician          # .claude/agents/diagnostician.md
+  model: claude-sonnet-5-5     # pinned (agent_design_worksheet.md section 5)
+  effort: high                 # decided 2026-11-05 (Jamie)
+  max_turns: 3
+  retries: 1                   # invalid output: one retry with the errors, then forced escalate

@@ -1,5 +1,114 @@
 # Running log
 
+## 2026-11-11
+
+**Done**
+- First agent-loop study, `runs/agent-pilot` (`--approve all`, 20 runs in 4 rounds of 5, 100 epochs,
+  outcome thresholds 0.01 / 0.04). Ran 5-11 Nov; slowed by Modern Standby on battery (training
+  pauses whenever the laptop is unplugged and the screen turns off).
+- Three agent decisions, all valid on the first call (2 turns, 11-13 s, about $0.07 each):
+
+  | After round | Decision | Outcome | Best loss before -> after |
+  |---|---|---|---|
+  | 0 | change_structure: pd_head on (non-PD 179 of 2,032) | improved | 0.129 -> 0.119; non-PD 0.088 -> 0 |
+  | 1 | retune: hidden {256, 512}, lr [3e-4, 2e-3], batch {32, 64} | improved | 0.119 -> 0.085 |
+  | 2 | retune: layers [5, 8], lr [2e-4, 1e-3] | failed (drop 0.0076 < 0.01) | 0.085 -> 0.077 |
+
+- Best run `round-3/trial-019` (hidden 256, 8 layers, lr 3.7e-4, wd 5.6e-4, batch 32), against
+  `main-full-pd` on the same 2,032 validation lattices:
+
+  | | main-full-pd | agent-pilot best |
+  |---|---|---|
+  | Loss | 0.110 | 0.077 |
+  | Non-PD | 0 | 0 |
+  | Moduli median % error | 28.5 | 21.0 |
+  | Ex / Ey / Ez % | 25.5 / 25.8 / 27.7 | 20.4 / 19.0 / 20.2 |
+  | Gyz / Gxz / Gxy % | 29.5 / 31.0 / 31.0 | 21.0 / 22.9 / 22.4 |
+  | Couplings median abs. error | 0.042 | 0.030 |
+
+- Observations for Lab Report 3:
+  - The agent's predictions for pd_head held (non-PD to 0, moduli little changed).
+  - Width 512: 4 of 5 runs diverged or trained badly (trials 11, 15, 17, 18; lr 4.9e-4 to
+    9.7e-4; loss about 0.82 or 0.24). The one good 512 run used lr 3.4e-4. The third decision's ranges allowed this; three of its five runs
+    were lost. The agent flagged its evidence for that decision as thin.
+  - Best epochs of the good runs are 92-100 of 100: the epoch cap still limits accuracy. The
+    agent noted that epochs are not a searchable setting.
+  - Small evidence slips: "10 runs remain, which is one full round of 5" (it is two rounds).
+  - The last outcome (0.0076 drop vs 0.01 threshold) lies within the seed spread either way.
+  - Single seed per run; the best run is the minimum of 20, so its loss is optimistically biased.
+
+**Remaining**
+- Retrain the best configuration with seeds 1-2 and a higher epoch cap; test-set evaluation.
+- Compare with the Optuna baseline at the same budget (TODO section 11).
+- Lab Report 3 (due 15 Nov).
+
+## 2026-11-05
+
+**Done**
+- Diagnostician effort level: high (Jamie). Pinned with the model in the new `agent` section of
+  `config/loop.yaml` (`claude-sonnet-5-5`, effort high, 3 turns, 1 retry).
+- Diagnostician (TODO section 9): `.claude/agents/diagnostician.md` (no tools) and
+  `python -m agents.diagnostician <run or study folder>`. It writes the input (state, eval.json
+  with the run's settings, optimizer history, decision log) to `agent/prompt-<n>.md`, calls
+  `claude -p` with `--json-schema`, validates with `lattice_gnn.validate`, retries once with the
+  errors, then forces an escalation. Logs `decisions.jsonl` and `run_info.json` (model requested
+  and used, Claude Code version, effort, tokens, cost estimate). `tests/test_diagnostician.py`
+  uses a fake `claude`; 66 tests pass.
+- Fix: Claude Code rejects a `$schema` key for draft 2020-12, so `DECISION_SCHEMA` has none.
+- First real decision, on `runs/main-full` (not committed): valid on the first call; 9.5 s,
+  2 turns, 11,161 input tokens (cache creation) and 1,156 output, $0.056 client estimate,
+  model used `claude-sonnet-5-5`, Claude Code 2.1.316.
+  - Decision: change_structure, `pd_head` = true. Reason: 194 / 2,032 non-PD with 0 non-PD
+    labels, spread across families; `augment` already on.
+  - Prediction: non-PD 194 -> 0 in every family; coupling error (0.046) about the same or
+    slightly better; moduli error (30.8%) within a few points; failed if non-PD > 0 or coupling
+    error rises by > 0.02.
+  - Checked against `runs/main-full-pd` (2026-11-04): non-PD 0, couplings 0.042, moduli 28.5%.
+    The prediction holds; one seed, and the run existed before the decision.
+  - One wrong number in its evidence: "15 of 20 runs remain" (19 remain after 1 run). The
+    validator checks the budget itself, so this did not matter here, but evidence text is not
+    checked.
+
+- The loop (TODO section 10), `agents/diagnostician/loop.py`:
+  `python -m agents.diagnostician.loop --config config/loop.yaml --name <name> [--approve ask|all|none]`.
+  - Each round: Optuna runs 5 training runs over the current search ranges with the structure
+    fixed (the optimizer never sets menu switches here, only the agent does); a new Optuna study
+    per round, sampler seed + round. Then check_target, one agent decision, the human gate, apply.
+  - Human gate: retunes run without approval; `ask` asks at the terminal for every
+    change_structure and on escalation (continue or stop). `all` / `none` approve / refuse every
+    change_structure unattended, and stop on escalation (counts as not solved).
+  - After the next round, code fills in the decision's `outcome` (improved | failed): the round's
+    best run against the best before it, beyond `outcome.min_loss_drop` (objective) or
+    `outcome.min_non_pd_drop`. Both are placeholders (0) until the seed spread is known.
+  - Writes `runs/<name>/`: loop.json, round-<r>/trial-<n>/, trials.json, decisions.jsonl,
+    run_info.json, agent/, summary.json.
+  - `tests/test_loop.py`: 6 end-to-end tests on the sample file with a fake `claude` (retune,
+    structure change approved / refused, escalation stop / continue, failed option -> forced
+    escalation). 72 tests pass.
+- Human gate for the unattended studies: `--approve all` (Jamie); recorded in the worksheet,
+  section 7.
+- Seed-spread runs: `runs/main-full-s1`, `runs/main-full-pd-s1` (seed 1, else as seed 0). Same
+  2,032 validation lattices:
+
+  | Run | Seed | Loss | Non-PD (rate) | Moduli median % error | Couplings median abs. error |
+  |---|---|---|---|---|---|
+  | main-full | 0 | 0.1119 | 194 (0.095) | 30.8 | 0.046 |
+  | main-full-s1 | 1 | 0.1239 | 110 (0.054) | 33.3 | 0.051 |
+  | main-full-pd | 0 | 0.1099 | 0 | 28.5 | 0.042 |
+  | main-full-pd-s1 | 1 | 0.1134 | 0 | 30.3 | 0.045 |
+
+  - Seed-to-seed gap in loss: 0.012 without pd_head, 0.0035 with it (pooled s.d. about 0.006).
+    Gap in non-PD rate without pd_head: 0.041.
+  - pd_head lowers the loss with both seeds (by 0.002 and 0.010; mean 0.006). That is inside the
+    seed spread, so two seeds do not establish an accuracy gain. The removal of non-PD
+    predictions is unambiguous (0 with both seeds).
+  - Every run is still improving at epoch 100 (best epochs 94-99).
+
+**Remaining**
+- Seed spread -> `outcome` thresholds in `config/loop.yaml`.
+- `family_balanced_loss` on the menu before the studies start.
+- Decision consistency on frozen reports (TODO section 11), e.g. `main-full` x 10 calls.
+
 ## 2026-11-04
 
 **Done**
@@ -15,9 +124,34 @@
   - Check on `subset_300.txt`, `splits/main.json`, 30 epochs: non-PD 0 / 40 with the head,
     2 / 40 without; validation loss 0.632 vs 0.651 (too small a set to compare accuracy).
 
+- Agent output schema and validator (TODO section 9), `lattice_gnn/validate.py`:
+  - `DECISION_SCHEMA`: `decision`, `reason`, `evidence`, plus `ranges` (retune),
+    `menu_option` + `prediction` (change_structure) or `would_try` (escalate). Which fields each
+    decision needs is checked in code, so the schema has no conditionals for `claude -p`.
+  - `validate(decision, state) -> {ok, errors, force_escalate}`. Rules: well-formed; retune
+    ranges inside `limits`; menu option on the menu, a real change, under the cap of 3
+    structural changes; enough budget for a round of 5 runs. Proposing an option that already
+    failed forces escalation (no retry). Escalate is always allowed if well-formed.
+  - `config/loop.yaml`: new `limits` (hard bounds on the agent's ranges, wider than `search`),
+    `budget.round_runs: 5`, `budget.max_structural_changes: 3`. `jsonschema` pinned.
+  - `tests/test_validate.py`: 37 tests, at least one per rule; 59 tests pass in total.
+- `runs/main-full-pd` (not committed): `main-full`'s settings plus `--pd-head`, ~1.5 h,
+  `python train.py Unit_Cell_Catalog/Unit_Cell_Catalog.txt --split-file splits/main.json --epochs 100 --patience 40 --pd-head --run-id main-full-pd`.
+  Same 2,032 validation lattices in 67 families as `main-full`.
+  - Non-PD predictions: 0 / 2,032 (`main-full`: 194, 9.5%).
+  - Best epoch 99 (`main-full`: 97); validation loss 0.110 (0.112); both still falling at 100.
+  - Median error over the moduli 28.5% (30.8%), over the couplings 0.042 (0.046). Per target:
+    Gxy 31.0% (38.8%), Gxz 31.0% (34.3%); Ey 25.8% (24.8%) is the one modulus slightly worse.
+    R² 0.89-0.93 on the moduli, 0.83-0.84 on the couplings (same ranges as `main-full`).
+  - The 5 families with the most non-PD in `main-full` (15-25 each): 0 non-PD, coupling error
+    equal or lower in 4 of 5.
+  - One seed each: the accuracy differences are within what seed-to-seed spread may explain
+    (not measured yet). The non-PD result holds by construction.
+
 **Remaining**
-- A `pd_head` run on the full catalog, to compare with `main-full` (9.5% non-PD).
-- `validate.py` and the diagnostician (Lab Report 3).
+- Seed spread for the full-catalog runs (needed anyway to judge the agent's decisions).
+- Check the `limits` values (proposed, not yet decided).
+- The diagnostician: agent spec, input file, one `claude -p` call (Lab Report 3).
 
 ## 2026-11-01
 
