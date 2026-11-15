@@ -1,5 +1,36 @@
 # Running log
 
+## 2026-11-15
+
+**Done**
+- Rule-table decider (`agents/diagnostician/rules.py`, `--decider rules`, 6 tests) and
+  `config/loop_subset.yaml` (2,000-lattice subset, width capped at 256, loss threshold 0.02 from
+  the subset seed spread).
+- Three-way subset study (`scripts/run_lr3_study.sh`), 20 runs of 100 epochs each, same split and
+  sampler seed, 239 validation lattices. Ran 13-15 Nov.
+
+  | Condition | Best loss | Non-PD | Moduli % | Couplings | Runs | Decisions (outcome) |
+  |---|---|---|---|---|---|---|
+  | `optuna-sub` | 0.225 | 0.084 | 54.0 | 0.081 | 20 | none |
+  | `rules-sub` | 0.218 | 0 | 52.9 | 0.080 | 20 | pd_head (improved); retune (failed); retune (failed) |
+  | `agent-sub` | 0.229 | 0 | 56.8 | 0.085 | 15 | pd_head (improved); retune (failed); escalate |
+  | `main-2000-pd`, seeds 0 / 1 | 0.216 / 0.239 | 0 | 47.6 / 62.0 | 0.075 / 0.078 | - | - |
+
+- Observations:
+  - No condition beats the untuned model with pd_head; all lie within its seed spread.
+  - Agent and rules trained identical settings in rounds 0-1 (shared seed), but losses differed by
+    up to 0.024: CPU training is not bit-reproducible.
+  - Agent escalated after round 2 with 5 runs unused ("poor generalization to unseen families").
+    Decisions took 11-14 s, about $0.05-0.06 each, all valid on the first call.
+  - The rules zoom keeps the top-3 runs' widths, so it allowed width 64; round 2 was all width 64.
+  - Optuna tried pd_head in 6 of 20 runs, all with small widths or high lr; its best is 8% non-PD.
+  - `agent-sub/round-1/trial-007` shows 39.9 h of wall time: Modern Standby, not training.
+- Demo deck `reports/lab_report_3_demo.pptx`; figures from `scripts/make_demo_figures.py`; deck
+  numbers checked by `scripts/check_demo_numbers.py`.
+
+**Remaining**
+- Lab Report 3: page markers for Rodrigues / Kim / AITM, AITM authors, slides link, commit count.
+
 ## 2026-11-11
 
 **Done**
