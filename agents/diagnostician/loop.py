@@ -21,6 +21,7 @@ than `outcome.min_loss_drop` in the objective, or lowers the non-PD rate by more
 Usage (repo root):
     python -m agents.diagnostician.loop --config config/loop.yaml --name agent-0
     python -m agents.diagnostician.loop --name tiny --runs 4 --epochs 2 --approve all
+    python -m agents.diagnostician.loop --decider rules --name rules-0 --approve all   (baseline)
 
 Writes runs/<name>/: loop.json (settings), round-<r>/trial-<n>/ (one folder per training run),
 trials.json (all runs, the agent's optimizer history), decisions.jsonl and run_info.json (from
@@ -44,8 +45,10 @@ from lattice_gnn.optimize import check_target, score, suggest
 from lattice_gnn.training import git_commit, train
 
 from .agent import decide, read_jsonl
+from .rules import decide_rules
 
 APPROVE_MODES = ("ask", "all", "none")
+DECIDERS = ("agent", "rules")
 
 
 def run_round(loop: dict, search: dict, structure: dict, folder: Path, round_no: int,
@@ -109,14 +112,14 @@ def judge(before: dict, round_trials: list[dict], outcome: dict) -> tuple[str, d
 
 
 def run_loop(loop: dict, name: str, runs_dir: str | Path = "runs", approve: str = "ask",
-             graphs=None, decide_fn=None, ask=input, log=print) -> dict:
+             graphs=None, decide_fn=None, ask=input, log=print, decider: str = "agent") -> dict:
     """Run the loop until a stopping rule or an escalation; returns summary.json's content."""
     if approve not in APPROVE_MODES:
         raise ValueError(f"approve must be one of {APPROVE_MODES}")
     folder = Path(runs_dir) / name
     folder.mkdir(parents=True, exist_ok=False)
     (folder / "loop.json").write_text(json.dumps(
-        {"loop": loop, "approve": approve, "git_commit": git_commit(), "optuna": optuna.__version__}, indent=1))
+        {"loop": loop, "approve": approve, "decider": decider, "git_commit": git_commit(), "optuna": optuna.__version__}, indent=1))
     if graphs is None:
         graphs = load_dataset(loop["data"]["paths"])
     if decide_fn is None:
@@ -194,6 +197,8 @@ def main():
     parser.add_argument("--runs-dir", default="runs")
     parser.add_argument("--approve", choices=APPROVE_MODES, default="ask",
                         help="human gate for structural changes and escalations (see module docstring)")
+    parser.add_argument("--decider", choices=DECIDERS, default="agent",
+                        help="agent: the LLM diagnostician; rules: the rule-table baseline (rules.py)")
     parser.add_argument("--runs", type=int, help="override budget.runs (e.g. a tiny test loop)")
     parser.add_argument("--epochs", type=int, help="override training.epochs")
     args = parser.parse_args()
@@ -203,10 +208,11 @@ def main():
         loop["budget"]["runs"] = args.runs
     if args.epochs is not None:
         loop["training"]["epochs"] = args.epochs
-    if shutil.which("claude") is None:
+    if args.decider == "agent" and shutil.which("claude") is None:
         sys.exit("Claude Code (`claude`) not found on PATH.")
+    decide_fn = (lambda f, lp, structure: decide_rules(f, lp, structure)) if args.decider == "rules" else None
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    run_loop(loop, args.name, args.runs_dir, args.approve)
+    run_loop(loop, args.name, args.runs_dir, args.approve, decide_fn=decide_fn, decider=args.decider)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
-"""Draw the agent-design figure for Lab Report 2 (template item C1).
+"""Draw the agent-design figure for the lab reports (template item C1).
 
 Usage:
-    python scripts/make_design_figure.py            # -> reports/figures/agent_design.{pdf,png}
+    python scripts/make_design_figure.py              # Lab Report 3 -> reports/figures/agent_design_lr3.{pdf,png}
+    python scripts/make_design_figure.py --report 2   # Lab Report 2 -> reports/figures/agent_design.{pdf,png}
 
 Layout follows the Lab 1 debrief's version B, drawn as one loop: the tools run up the left
 (optimizer -> train -> evaluate -> target check), the target check hands over to the one LLM
@@ -13,6 +14,8 @@ if any text runs outside its box.
 from __future__ import annotations
 
 from pathlib import Path
+
+import argparse
 
 import matplotlib
 
@@ -26,6 +29,7 @@ INK, MUTED = "#1f2328", "#57606a"
 TOOL = {"fc": "#f3f4f6", "ec": "#1f2328", "ls": "-"}
 LLM = {"fc": "#fae3d0", "ec": "#eb6834", "ls": "-"}
 HUMAN = {"fc": "white", "ec": "#1f2328", "ls": (0, (4, 3))}
+DONE = "#1a7f37"     # status text of finished modules (Lab Report 3)
 ACCENT = "#c4501a"   # arrows that carry the agent's decision back into the loop
 
 FS_TITLE, FS_BODY, FS_LABEL = 8, 7, 6.5
@@ -43,8 +47,11 @@ def box(ax, x, y, w, h, style, title, body, status=None):
              ax.text(x + w / 2, y + h - 0.62, body, ha="center", va="top", fontsize=FS_BODY,
                      color=INK, linespacing=1.35, multialignment="center")]
     if status:
+        done = status.startswith("finished")
         texts.append(ax.text(x + w - 0.15, y + 0.1, status, ha="right", va="bottom",
-                             fontsize=FS_LABEL, color=MUTED, style="italic"))
+                             fontsize=FS_LABEL, color=DONE if done else MUTED,
+                             style="normal" if done else "italic",
+                             fontweight="bold" if done else "normal"))
     boxes.append(((x, y, w, h), texts))
 
 
@@ -86,7 +93,9 @@ def check_overflow(fig, ax):
         raise SystemExit("Figure layout problems:\n  " + "\n  ".join(problems))
 
 
-def main():
+def main(report: int = 3):
+    lr3 = report == 3
+    ok = "finished" if lr3 else "built"
     fig, ax = plt.subplots(figsize=(7.0, 6.0))
     ax.set_xlim(-0.1, 12.75)
     ax.set_ylim(-2.35, 8.45)
@@ -99,13 +108,17 @@ def main():
 
     # Left: the loop's tools, bottom to top.
     box(ax, LX, rows[0], LW, H, TOOL, "Tool 1 · Optimizer",
-        "Optuna (TPE): 5 training\nruns per round", "built")
+        "Optuna (TPE): 5 training\nruns per round", ok)
     box(ax, LX, rows[1], LW, H, TOOL, "Tool 2 · Train",
-        "train(config) → run_id;\nseeded, locked split", "built")
+        "train(config) → run_id;\nseeded, locked split", ok)
     box(ax, LX, rows[2], LW, H, TOOL, "Tool 3 · Evaluate",
-        "per-family errors and\nPD check → eval.json", "built")
-    box(ax, LX, rows[3], LW, H, TOOL, "Tool 4 · Target check",
-        "target met, budget used\nor no progress → stop", "built")
+        "per-family errors and\nPD check → eval.json", ok)
+    if lr3:
+        box(ax, LX, rows[3], LW, H, TOOL, "Tool 4 · Checks",
+            "decision improved?\n(seed spread); budget", ok)
+    else:
+        box(ax, LX, rows[3], LW, H, TOOL, "Tool 4 · Target check",
+            "target met, budget used\nor no progress → stop", "built")
     mid = LX + LW / 2
     for (lo, label) in zip(rows[:3], ("config", "run_id", "eval.json")):
         arrow(ax, (mid, lo + H), (mid, lo + H + GAP), label, label_xy=(mid + 0.12, lo + H + GAP / 2),
@@ -117,9 +130,9 @@ def main():
         "claude-sonnet-5-5, claude -p;\nJSON schema, no own tools\n\n"
         "Reads eval.json, trials.json\nand its own decision log\n\n"
         "Decides one of:\n(a) retune → new ranges\n(b) change structure → one\n"
-        "menu option, kept afterwards\n(c) escalate → human", "planned")
-    box(ax, CX, 0.9, CW, 1.4, TOOL, "Tool 5 · Validator",
-        "checks schema, menu option\nand budget (planned)")
+        "menu option, kept afterwards\n(c) escalate → human", ok if lr3 else "planned")
+    box(ax, CX, 0.75 if lr3 else 0.9, CW, 1.65 if lr3 else 1.4, TOOL, "Tool 5 · Validator",
+        "checks schema, menu option\nand budget" + ("" if lr3 else " (planned)"), ok if lr3 else None)
 
     gap_l = (LX + LW + CX) / 2
     arrow(ax, (LX + LW, rows[3] + H / 2), (CX, rows[3] + H / 2), "continue",
@@ -129,17 +142,25 @@ def main():
     arrow(ax, (CX, 1.3), (LX + LW, 1.3), "apply", color=ACCENT, label_xy=(gap_l, 1.5))
 
     # Right: human gate and the no-agent baseline.
-    box(ax, RX, 6.4, RW, 1.9, HUMAN, "Human gate",
-        "approves structural\nchanges and the\ntest-set unlock;\nanswers escalations")
-    box(ax, RX, 1.8, RW, 3.9, TOOL, "Baseline, no agent",
-        "Optuna alone searches\nhyperparameters and\nthe structural menu,\n"
-        "same tools, same\n20-run budget\n\n"
-        "Both run on the 64\nlocked test families,\n3 repeats each", "built")
+    if lr3:
+        box(ax, RX, 6.4, RW, 1.9, HUMAN, "Human gate",
+            "approves structural\nchanges; answers\nescalations", ok)
+        box(ax, RX, 3.3, RW, 2.4, TOOL, "Optuna baseline",
+            "hyperparameters and\nmenu searched jointly,\nsame 20-run budget", ok)
+        box(ax, RX, 0.55, RW, 2.4, TOOL, "Rule-table baseline",
+            "rule table replaces\nthe LLM in the loop:\nnon-PD → PD layer,\nelse zoom on best", ok)
+    else:
+        box(ax, RX, 6.4, RW, 1.9, HUMAN, "Human gate",
+            "approves structural\nchanges and the\ntest-set unlock;\nanswers escalations")
+        box(ax, RX, 1.8, RW, 3.9, TOOL, "Baseline, no agent",
+            "Optuna alone searches\nhyperparameters and\nthe structural menu,\n"
+            "same tools, same\n20-run budget\n\n"
+            "Both run on the 64\nlocked test families,\n3 repeats each", "built")
     gap_r = (CX + CW + RX) / 2
     arrow(ax, (CX + CW, 7.8), (RX, 7.8), "(b), (c)", label_xy=(gap_r, 8.02))
     arrow(ax, (RX, 6.95), (CX + CW, 6.95), "reply", label_xy=(gap_r, 6.73))
-    arrow(ax, (CX + CW, 4.1), (RX, 4.1), "compared", label_xy=(gap_r, 4.32), ls=(0, (3, 2)),
-          both=True)
+    arrow(ax, (CX + CW, 4.5 if lr3 else 4.1), (RX, 4.5 if lr3 else 4.1), "compared",
+          label_xy=(gap_r, 4.72 if lr3 else 4.32), ls=(0, (3, 2)), both=True)
 
     # Outside the research loop.
     ax.plot([0, 12.65], [-0.42, -0.42], color=MUTED, lw=0.6, ls=(0, (2, 2)))
@@ -148,7 +169,7 @@ def main():
     # The literature (retrieval) agent from Labs 4/5, with its own human check.
     lit_w, check_x = 4.6, 5.55
     box(ax, LX, -2.3, lit_w, 1.65, {**LLM, "ls": (0, (4, 3))}, "Literature agent (support)",
-        "retrieval over my own paper corpus;\nreturns claims with page citations", "built")
+        "retrieval over my own paper corpus;\nreturns claims with page citations", ok)
     box(ax, check_x, -2.3, CX + CW - check_x, 1.65, HUMAN, "Human check",
         "verifies each page\ncitation by hand")
     arrow(ax, (LX + lit_w, -1.475), (check_x, -1.475), "claims",
@@ -164,10 +185,13 @@ def main():
 
     check_overflow(fig, ax)
     OUT.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT / "agent_design.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "agent_design.png", dpi=200, bbox_inches="tight")
-    print(f"Saved {OUT / 'agent_design.pdf'} and .png")
+    stem = "agent_design_lr3" if lr3 else "agent_design"
+    fig.savefig(OUT / f"{stem}.pdf", bbox_inches="tight")
+    fig.savefig(OUT / f"{stem}.png", dpi=200, bbox_inches="tight")
+    print(f"Saved {OUT / stem}.pdf and .png")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--report", type=int, choices=(2, 3), default=3)
+    main(parser.parse_args().report)
