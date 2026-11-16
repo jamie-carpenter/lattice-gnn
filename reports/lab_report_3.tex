@@ -23,8 +23,6 @@
 \setlength{\parskip}{0.5ex}
 \setlength{\parindent}{0pt}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-% Draft-only: a citation location still to be converted to a page number after reading the PDF.
-\newcommand{\pg}[1]{\colorbox{yellow!40}{\small #1; p.~?}}
 
 \begin{document}
 
@@ -59,15 +57,15 @@ first finding more closely than I expected: the one decision with a clear payoff
 layer, follows from a single number in the evaluation report and could have been made by a rule.
 Two further studies sharpen this concern. In a budget- and seed-matched comparison on tabular
 data, Rodrigues et al.~\cite{rodrigues} found that an LLM advisor led seeded random search only in
-its first few evaluations and trailed it after twelve [\pg{Sec.~5.1}], and they attribute the early
+its first few evaluations and trailed it after twelve [Sec.~5.1], and they attribute the early
 lead to the default configuration the advisor started from rather than to the model itself
-[\pg{title, Sec.~5.2}]. Conversely, Kim et al.~\cite{kim} found that GPT-4 localized 25 faults
+[title, Sec.~5.2]. Conversely, Kim et al.~\cite{kim} found that GPT-4 localized 25 faults
 injected into deep-learning programs far more reliably than dedicated diagnosis tools
-[\pg{Sec.~6.1, Table~5}], although its random-search baseline for repair also performed well
-[\pg{Sec.~6.5}], and every injected fault had a single cause. Closest to this project, the AI
+[Sec.~6.1, Table~5], although its random-search baseline for repair also performed well
+[Sec.~6.5], and every injected fault had a single cause. Closest to this project, the AI
 Training Manager~\cite{aitm} corrected induced overfitting and unstable reinforcement learning with
-a bounded LLM controller between rounds [\pg{Tables~1--2}], yet its authors note that they did not
-compare it with a handcrafted controller [\pg{Limitations}]. None of these studies places a rule
+a bounded LLM controller between rounds [Tables~1--2], yet its authors note that they did not
+compare it with a handcrafted controller [Limitations]. None of these studies places a rule
 table and an LLM in the same loop, and none uses faults with more than one plausible cause, which
 is the comparison Section~D2 and the planned failures in Section~E are designed to make.
 
@@ -167,8 +165,9 @@ contained two arithmetic slips (for instance, ten remaining runs described as on
 the validator checks the budget itself, but evidence text is not checked.
 
 \textbf{Demo slides.}
-\rework{Google Slides link to the demo deck (template: one slide per finished module with input,
-output and a failure case).}
+\href{https://docs.google.com/presentation/d/1fSxOqZ8NDfNTN7x3azsYzhtkwMNODy9I/edit?usp=sharing}{\nolinkurl{docs.google.com/presentation/d/1fSxOqZ8NDfNTN7x3azsYzhtkwMNODy9I}}.
+One slide per finished module gives an input, the output and a failure case, followed by plots of
+its outputs and the final comparison of the three conditions.
 
 \section*{D \quad Evaluation}
 
@@ -258,24 +257,25 @@ Compute remains the main risk: the full-catalog pilot took six days of wall time
 the three-way comparison feasible now, and the full catalog will be reserved for the final runs.
 
 \section*{Progress log}
-\textbf{Done since Lab Report 2} (\texttt{LOG.md}, 4--13 November): the PD output layer with 22
+\textbf{Done since Lab Report 2} (\texttt{LOG.md}, 4--15 November): the PD output layer with 22
 tests; the decision schema and validator with 37 tests; the diagnostician and its first validated
 decision; the loop with human gate, outcome check and thresholds from the seed spread; the
 full-catalog pilot; the rule-table baseline and the three-way subset study.
 \textbf{Remaining:} the two further menu options, the planted-failure harness, repeats and the
 test-set evaluation. \textbf{Bottleneck:} CPU time (E).
-\textbf{Maintenance:} \rework{commit count since Lab Report 2 and LOG.md dates, after this
-week's commits.}
+\textbf{Maintenance:} seven commits since Lab Report~2 was merged on 1 November
+(4--15 November), and \texttt{LOG.md} entries on 4, 5, 11 and 15 November.
 
 \section*{AI usage disclosure}
 \textbf{Tools.} Claude Code (\texttt{claude-opus-5-5}) built this project under my direction: it
 wrote the code, tests and figure script and drafted this report from \texttt{LOG.md} and the run
 folders. The diagnostician itself is \texttt{claude-sonnet-5-5}, called through \texttt{claude -p}
-with no tools. \rework{Literature agent run for A2: model and folder.}
+with no tools. The new papers in A2 were found by a Claude Code literature subagent run from
+the same session; its notes are in \texttt{literature\_review/lr3/}.
 \textbf{My role and checks.} I made the design decisions, including the width cap, the rule-table
 baseline and the thresholds, and reviewed each step and each commit. Every number in this report
 comes from a logged run in \texttt{runs/} or from \texttt{LOG.md}, and I read every cited paper and
-checked each cited page.
+checked each cited section.
 
 \begin{thebibliography}{9}\footnotesize\setlength{\itemsep}{0pt}
 \bibitem{lumpe} T.~S. Lumpe, T.~Stankovi\'c. Exploring the property space of periodic cellular
@@ -290,7 +290,7 @@ checked each cited page.
   default configuration, not the model. arXiv:2606.21641, 2026.
 \bibitem{kim} J.~Kim, N.~Humbatova, G.~Jahangirova, S.~Yoo, P.~Tonella. Fault localisation and
   repair for DL systems: an empirical study with LLMs. arXiv:2506.03396, 2025.
-\bibitem{aitm} \rework{authors}. AI Training Manager: bounded closed-loop control of adaptive
+\bibitem{aitm} A.~Rao, N.~K.~Advani. AI Training Manager: bounded closed-loop control of adaptive
   training recipes. arXiv:2606.29871, 2026.
 \end{thebibliography}
 
