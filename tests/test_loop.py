@@ -97,3 +97,28 @@ def test_failed_option_forces_escalation(tmp_path, graphs):
     assert decisions[0]["outcome"] == "failed"
     assert decisions[1]["forced"] and "already failed" in decisions[1]["decision"]["reason"]
     assert summary["stop"].startswith("escalated") and summary["runs_used"] == 4
+
+
+def test_cpu_budget_cuts_round_short(tmp_path, graphs):
+    """CPU budget, no run count: the loop stops once the CPU-hours are spent, mid-round if need be,
+    and the agent's input shows the CPU-hours."""
+    loop = {**LOOP, "budget": {"cpu_hours": 1e-12, "round_runs": 2, "max_structural_changes": 3}}
+    summary, trials, decisions = loop_run(tmp_path, graphs, agent_says(RETUNE), loop=loop, approve="all")
+    assert summary["runs_used"] == 1 and "CPU-hours" in summary["stop"] and decisions == []
+    assert summary["cpu_hours_used"] == trials[0]["cpu_hours"] > 0
+
+
+def test_agent_sees_cpu_hours(tmp_path, graphs):
+    loop = {**LOOP, "budget": {"cpu_hours": 100.0, "round_runs": 2, "max_structural_changes": 3}}
+    loop_run(tmp_path, graphs, agent_says(ESCALATE), loop=loop, approve="all")
+    prompt = (tmp_path / "L" / "agent" / "prompt-0.md").read_text()
+    assert '"cpu_hours_total": 100.0' in prompt and '"cpu_hours_left"' in prompt
+    assert prompt.count('"cpu_hours":') >= 2                       # per trial, plus the report's compute
+
+
+def test_leftover_budget_stops_without_decision(tmp_path, graphs):
+    """Budget left but not enough for a full round: stop on budget, no decision asked or logged."""
+    loop = {**LOOP, "budget": {"runs": 5, "round_runs": 3, "max_structural_changes": 3}}
+    summary, trials, decisions = loop_run(tmp_path, graphs, agent_says(RETUNE), loop=loop, approve="all")
+    assert summary["runs_used"] == 3 and summary["stop"].startswith("budget used: 2 runs left")
+    assert decisions == []

@@ -27,10 +27,20 @@ read files or search. Everything you may use is in the message.
 
 1. State: the current structure (each menu switch's value), the menu, the current search ranges
    and the hard limits on them, the budget (runs used, runs per round, cap on structural
-   changes) and options that already failed.
+   changes, and, when the budget is counted in CPU-hours, the CPU-hours used and left) and
+   options that already failed.
 2. Evaluation report of the best run so far on the validation families: errors per target and
    per family, the non-PD count overall and per family, the worst families.
-3. Optimizer history: each training run's settings and scores, or a note that there is none.
+3. Optimizer history: each training run's settings, scores and CPU-hours, or a note that there
+   is none.
+
+## Compute
+
+When the budget has `cpu_hours_total`, the study ends when the CPU-hours run out, not after a
+fixed number of runs. Every run is paid for at its real cost: wider and deeper networks and
+smaller batches take longer per epoch, so a range that admits them buys fewer runs. Weigh a
+setting's expected gain against its cost per run, using the CPU-hours in the history; a
+round that trains badly at high cost leaves less for every later round.
 4. Decision log: your earlier decisions and what happened after each, or a note that there is
    none.
 
@@ -66,6 +76,7 @@ Options not listed in the state's menu do not exist yet; ask for them by escalat
   (escalate). No other fields.
 - Ranges stay inside the hard limits; a menu option must change the current structure; an
   option that already failed must not be proposed again; retune and change_structure need a
-  full round of runs left in the budget.
+  full round left in the budget (with CPU-hours: runs per round times the mean CPU-hours per
+  run so far).
 - Use only numbers in the message. Do not invent results, and do not assume a remedy works
   because it sounds right: weigh what the report shows. If the evidence is thin, say so.

@@ -137,3 +137,31 @@ def test_report_writes_tables_and_figures(tmp_path, graphs):
         assert (out / name).stat().st_size > 0
     text = (out / "report.md").read_text(encoding="utf-8")
     assert "## Positive definiteness" in text and "Ex" in text
+
+
+def test_check_target_cpu_budget():
+    result = {"loss": 1.0, "overall": {"median_percent_error_moduli": 5.0}, "pd": {"non_pd_rate": 0.0}}
+    goal = {"median_percent_error_moduli": 1}
+    cpu = {"cpu_hours": 2.0}
+    assert check_target(result, goal, 50, cpu, cpu_used=1.9)["decision"] == "continue"
+    assert "CPU-hours" in check_target(result, goal, 3, cpu, cpu_used=2.1)["reason"]
+    both = {"runs": 4, "cpu_hours": 2.0}                           # whichever runs out first
+    assert "4 runs" in check_target(result, goal, 4, both, cpu_used=0.5)["reason"]
+    with pytest.raises(ValueError):
+        check_target(result, goal, 1, {"no_progress": 3})
+
+
+def test_run_records_compute(tmp_path, graphs):
+    run_id = train(tiny(tmp_path, run_id="c"), graphs=graphs)
+    ev = json.loads((tmp_path / run_id / "eval.json").read_text())
+    hist = json.loads((tmp_path / run_id / "history.json").read_text())
+    assert ev["compute"] == hist["compute"]
+    assert ev["compute"]["cpu_hours"] > 0 and ev["compute"]["wall_hours"] > 0 and ev["compute"]["threads"] >= 1
+
+
+def test_study_stops_on_cpu_budget(tmp_path, graphs):
+    loop = {**LOOP, "budget": {"cpu_hours": 1e-12}}                # used up by the first run
+    final = optimize(loop, "cpu", tmp_path, graphs=graphs)
+    trials = json.loads((tmp_path / "cpu" / "trials.json").read_text())
+    assert len(trials["trials"]) == 1 and "CPU-hours" in final["check"]["reason"]
+    assert trials["cpu_hours_used"] == trials["trials"][0]["cpu_hours"] > 0

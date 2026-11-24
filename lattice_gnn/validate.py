@@ -17,7 +17,8 @@ with the errors, then escalates. Rules:
   3. change_structure: the switch is on the menu, the value is one of its choices, it changes
      the current structure, and the cap on structural changes is not reached
   4. an option that already failed is not proposed again (forces escalation, no retry)
-  5. retune and change_structure need a full round of runs left in the budget
+  5. retune and change_structure need a full round left in the budget: `round_runs` runs, and,
+     with a CPU-hour budget, `round_runs` times the mean CPU-hours per run so far
 
 `state` is built by state_from_loop(); escalate is always allowed if well-formed.
 
@@ -78,7 +79,7 @@ DECISION_SCHEMA = {
 
 
 def state_from_loop(loop: dict, structure: dict | None = None, failed: list | None = None,
-                    runs_used: int = 0, structural_changes: int = 0) -> dict:
+                    runs_used: int = 0, structural_changes: int = 0, cpu_hours_used: float = 0.0) -> dict:
     """What validate() needs, from config/loop.yaml plus where the loop is now.
 
     structure: current value of each menu switch (default: the first choice of each).
@@ -92,9 +93,26 @@ def state_from_loop(loop: dict, structure: dict | None = None, failed: list | No
         "structure": structure if structure is not None else {k: v[0] for k, v in menu.items()},
         "failed": list(failed or []),
         "runs_used": runs_used,
+        "cpu_hours_used": cpu_hours_used,
         "budget": loop["budget"],
         "structural_changes": structural_changes,
     }
+
+
+def round_shortfall(budget: dict, runs_used: int, cpu_hours_used: float = 0.0) -> str | None:
+    """None if the budget left pays for one more round, else why not (rule 5; the loop also stops
+    on it before asking for a decision). A round is `round_runs` runs; with a CPU-hour budget it
+    is costed at the mean CPU-hours per run so far."""
+    need = budget.get("round_runs", 1)
+    if "runs" in budget and budget["runs"] - runs_used < need:
+        return f"{budget['runs'] - runs_used} runs left, a round needs {need}"
+    if "cpu_hours" in budget:
+        left = budget["cpu_hours"] - cpu_hours_used
+        cost = need * cpu_hours_used / runs_used if runs_used else 0.0
+        if left <= 0 or left < cost:
+            return (f"{left:.2f} CPU-hours left, a round of {need} runs needs about {cost:.2f} "
+                    "at the mean cost so far")
+    return None
 
 
 def _check_range(name: str, spec: dict, limits: dict) -> list[str]:
@@ -170,10 +188,9 @@ def validate(decision, state: dict) -> dict:
             errors.append(f"cap of {cap} structural changes reached; escalate instead")
 
     # 5. budget
-    left = state["budget"]["runs"] - state["runs_used"]
-    need = state["budget"].get("round_runs", 1)
-    if left < need:
-        errors.append(f"budget: {left} runs left, a round needs {need}; escalate or stop instead")
+    short = round_shortfall(state["budget"], state["runs_used"], state.get("cpu_hours_used", 0.0))
+    if short:
+        errors.append(f"budget: {short}; escalate or stop instead")
     return result(errors)
 
 

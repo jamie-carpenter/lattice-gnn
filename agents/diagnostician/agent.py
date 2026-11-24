@@ -28,6 +28,7 @@ from pathlib import Path
 
 import yaml
 
+from lattice_gnn.optimize import cpu_hours
 from lattice_gnn.training import DEFAULTS
 from lattice_gnn.validate import DECISION_SCHEMA, state_from_loop, validate
 
@@ -48,11 +49,13 @@ def load_target(folder: Path) -> dict:
         run = folder / trials["best"]["run_id"]
         history = trials
         runs_used = len(trials["trials"])
+        cpu_used = sum(t.get("cpu_hours", 0.0) for t in trials["trials"])
     else:
-        run, history, runs_used = folder, None, 1
-    return {"config": json.loads((run / "config.json").read_text()),
-            "eval": json.loads((run / "eval.json").read_text()),
-            "history": history, "runs_used": runs_used}
+        run, history, runs_used, cpu_used = folder, None, 1, None
+    result = json.loads((run / "eval.json").read_text())
+    return {"config": json.loads((run / "config.json").read_text()), "eval": result,
+            "history": history, "runs_used": runs_used,
+            "cpu_hours_used": cpu_hours(result) if cpu_used is None else cpu_used}
 
 
 def state_for(target: dict, loop: dict, decisions: list[dict], structure: dict | None = None) -> dict:
@@ -72,7 +75,8 @@ def state_for(target: dict, loop: dict, decisions: list[dict], structure: dict |
         elif dec["decision"] == "retune":
             failed.append({"name": "retune", "value": dec["ranges"]})
     return state_from_loop(loop, structure=structure, failed=failed, runs_used=target["runs_used"],
-                           structural_changes=sum(d["decision"]["decision"] == "change_structure" for d in applied))
+                           structural_changes=sum(d["decision"]["decision"] == "change_structure" for d in applied),
+                           cpu_hours_used=target.get("cpu_hours_used", 0.0))
 
 
 # ---------------------------------------------------------------- the agent's input
@@ -87,7 +91,12 @@ def build_prompt(target: dict, state: dict, loop: dict, decisions: list[dict]) -
     state_view = {
         "structure": state["structure"], "menu": state["menu"],
         "search_ranges": loop["search"], "hard_limits": state["limits"],
-        "budget": {"runs_total": budget["runs"], "runs_used": state["runs_used"],
+        "budget": {**({"runs_total": budget["runs"]} if "runs" in budget else {}),
+                   "runs_used": state["runs_used"],
+                   **({"cpu_hours_total": budget["cpu_hours"],
+                       "cpu_hours_used": round(state["cpu_hours_used"], 3),
+                       "cpu_hours_left": round(budget["cpu_hours"] - state["cpu_hours_used"], 3)}
+                      if "cpu_hours" in budget else {}),
                    "runs_per_round": budget.get("round_runs"),
                    "structural_changes_used": state["structural_changes"],
                    "structural_changes_cap": budget.get("max_structural_changes")},
@@ -103,7 +112,7 @@ def build_prompt(target: dict, state: dict, loop: dict, decisions: list[dict]) -
     else:
         history = {"objective": target["history"]["objective"], "best": target["history"]["best"],
                    "trials": [{k: t[k] for k in ("round", "number", "params", "value", "best_epoch",
-                                                 "overall", "non_pd_rate") if k in t}
+                                                 "overall", "non_pd_rate", "cpu_hours") if k in t}
                               for t in target["history"]["trials"]]}
     log = [{k: d.get(k) for k in ("decision", "forced", "approved", "outcome")} for d in decisions] \
         or "None yet: this is the first decision."
@@ -207,6 +216,10 @@ def decide(folder: str | Path, loop: dict, claude: str = "claude", runner=run_cl
         stdout = runner(command, prompt)
         (out / f"response-{n}.json").write_text(stdout, encoding="utf-8")
         answer, info = parse_result(stdout)
+        if info["is_error"] and not isinstance(answer, dict):
+            # The call itself failed (e.g. expired sign-in, 2026-11-24): not the agent's answer, so
+            # never logged as a decision or a forced escalation. Stop the run instead.
+            raise RuntimeError(f"claude call failed ({out / f'response-{n}.json'}): {str(answer)[:300]}")
         check = validate(answer, state)
         run_info["calls"].append({
             "call": n, "attempt": attempt,

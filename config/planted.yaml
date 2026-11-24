@@ -1,0 +1,153 @@
+# Planted failures for Lab Report 4 (TODO section 11), run with agents/diagnostician/planted.py.
+# Each case is config/loop_lr4.yaml (22 CPU-hours, width cap lifted) with `overrides` merged in
+# (dicts merged key by key, everything else replaced). The answer key is fixed here, before any
+# case is run, and is checked by code (planted.py score), never by an LLM. It is stored apart
+# from the loop's settings and never enters the agent's input.
+#
+# Two kinds of case (Jamie, 2026-11-24):
+#   known      the planted cause has a correct remedy; `checks` must pass, `wrong` must not.
+#              Compound: each is built so that the one-line rule a script would use gives the
+#              wrong answer (rule table, agents/diagnostician/rules.py).
+#   ambiguous  no single correct answer. `acceptable` says in words which first decisions are
+#              defensible; code flags only the `unsupported` ones (matches below) and reports
+#              how the decisions spread. Run as frozen repeats only
+#              (one round of training, then 10 agent calls and the rule table on that report).
+#
+# Check syntax (planted.py `matches`): `when` first | any (which decisions to look at);
+# `match` keys, all of which must hold for one decision:
+#   decision      retune | change_structure | escalate
+#   lr_high_max   retune whose lr range has high <= this
+#   lr_low_min    retune whose lr range has low >= this
+#   excludes      {setting: value}: retune whose categorical range for `setting` omits `value`
+#   menu_option   {name, value}: change_structure to exactly this
+#   mentions      text found in the decision's reason, evidence or would_try (case-insensitive)
+# `any_of` lists alternative matches; the check passes if one of them holds.
+#
+# Learning rates: on the subset, the good runs of Lab Report 3 used lr 2.5e-4 to 1e-3 (LOG.md,
+# 2026-11-15); the agent-pilot's good width-512 run used 3.4e-4, its diverged ones 4.9e-4 to
+# 9.7e-4 (LOG.md, 2026-11-11).
+
+base: config/loop_lr4.yaml
+
+cases:
+  collapse:
+    kind: known
+    description: >
+      Learning-rate range far too high (1e-2 to 1e-1). Training collapses to predicting the
+      mean (loss about 1.0, moduli errors near 580%) and stops early. Retuning the learning rate
+      down fixes it; no structural change can.
+    # Probe 2026-11-24 (width 128, 100 epochs, PD layer off): lr 3e-2 -> loss 1.008, best epoch 4;
+    # lr 1e-1 -> loss 1.009, best epoch 19; non-PD 0 in both, because a collapsed model predicts
+    # mean couplings, which are PD. Replaces the planned "divergence non-PD" case, whose premise
+    # (non-PD predictions caused by unstable training) this probe did not bear out.
+    overrides:
+      search:
+        lr: {type: float, low: 1.0e-2, high: 1.0e-1, log: true}
+    answer:
+      checks:
+        - id: lowers_lr_first
+          text: the first decision is a retune that brings the lr range below 3e-3
+          when: first
+          match: {decision: retune, lr_high_max: 3.0e-3}
+      wrong:
+        - id: structure_first
+          text: the first decision changes the structure (no menu option addresses collapse)
+          when: first
+          match: {decision: change_structure}
+
+  units_low_lr:
+    kind: known
+    description: >
+      Moduli labels of one large validation family scaled by 10 (a units mistake), and a
+      learning-rate range too low to train well. Two causes: one a retune fixes, one only a
+      human can.
+    # Probe 2026-11-24 (width 128, 100 epochs, PD layer off, no label fault): lr 1e-5 -> loss 0.542
+    # (good runs about 0.22), moduli 169%, still improving at epoch 96 of 100, non-PD 0.042. So
+    # the round-0 report also shows non-PD predictions, and rule 1 will turn the PD layer on first.
+    overrides:
+      training:
+        label_faults:
+          - {family: tet_Z04.8, kind: moduli_log10_shift, value: 1.0}
+      search:
+        lr: {type: float, low: 1.0e-5, high: 3.0e-5, log: true}
+    answer:
+      checks:
+        - id: raises_lr
+          text: some retune moves the whole lr range to 1e-4 or above
+          when: any
+          match: {decision: retune, lr_low_min: 1.0e-4}
+        - id: names_family
+          text: some escalation names tet_Z04.8
+          when: any
+          match: {decision: escalate, mentions: tet_Z04.8}
+      wrong: []
+
+  width_trap:
+    kind: known
+    description: >
+      Search over widths 256 and 512 at learning rates where width 512 diverged in the
+      agent-pilot. Width-512 runs cost many times more CPU-hours and mostly train badly.
+    overrides:
+      search:
+        hidden: {type: categorical, choices: [256, 512]}
+        lr: {type: float, low: 5.0e-4, high: 1.5e-3, log: true}
+      budget:
+        round_runs: 3       # width-512 runs are costly; 5 per round would leave too few decisions
+    answer:
+      checks:
+        - id: drops_512_or_lowers_lr
+          text: the first decision is a retune that drops width 512 or brings lr to 4e-4 or below
+          when: first
+          any_of:
+            - {decision: retune, excludes: {hidden: 512}}
+            - {decision: retune, lr_high_max: 4.0e-4}
+      wrong: []
+
+  control:
+    kind: ambiguous
+    description: >
+      No fault: PD layer on and the search ranges of Lab Report 3's good runs. Nothing on the
+      menu is indicated.
+    overrides:
+      start_structure: {pd_head: true}
+      search:
+        lr: {type: float, low: 2.0e-4, high: 1.0e-3, log: true}
+        hidden: {type: categorical, choices: [128, 256]}
+    answer:
+      acceptable: retune or escalate
+      unsupported:
+        - {decision: change_structure}
+
+  hidden_noise:
+    kind: ambiguous
+    description: >
+      Labels shuffled among the 126 lattices of the largest training family (tet_Z04.0), as if
+      records were misaligned. The agent never sees training labels, so it can only notice
+      broadly worse errors; no menu option or retune fixes it.
+    overrides:
+      start_structure: {pd_head: true}
+      training:
+        label_faults:
+          - {family: tet_Z04.0, kind: shuffle, value: 0}
+    answer:
+      acceptable: retune or escalate
+      unsupported:
+        - {decision: change_structure}
+
+  two_causes:
+    kind: ambiguous
+    description: >
+      PD layer off and a learning-rate range too low to finish training. The report shows both
+      non-PD predictions and an under-trained model, so turning the PD layer on and raising the
+      learning rate are both defensible first steps.
+    # Probes 2026-11-24 (width 128, 100 epochs, PD layer off): lr 1e-5 -> loss 0.542, still
+    # improving at epoch 96, non-PD 0.042; lr 5e-3 -> loss 0.873, non-PD 0; lr 3e-2 and 1e-1 ->
+    # collapse, non-PD 0. Non-PD predictions come from a partly trained model, never from a
+    # collapsed one, so the planned high-lr version of this case would have shown no non-PD.
+    overrides:
+      search:
+        lr: {type: float, low: 1.0e-5, high: 5.0e-5, log: true}
+    answer:
+      acceptable: raise the lr range, turn the PD layer on, or escalate
+      unsupported:
+        - {decision: change_structure, menu_option: {name: augment, value: false}}

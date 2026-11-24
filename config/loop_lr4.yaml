@@ -1,0 +1,86 @@
+# Lab Report 4 studies (from 2026-11-24): same as loop_subset.yaml (the Lab Report 3 study) except
+#   - budget in CPU-hours instead of runs (TA feedback on Lab Report 3), so a costly setting buys
+#     fewer runs. CPU time is the process's CPU time summed over its threads, recorded per run in
+#     eval.json `compute` (lattice_gnn.training); standby does not count.
+#   - the width cap of 256 is lifted: width 512 is back in the limits and in the starting search
+#     ranges of every condition, now that it costs its real price.
+# Settings for the optimizer baseline (lattice_gnn.optimize) and, later, the agent loop.
+# Every training run in a study uses the same data, split and fixed settings; only the
+# `search` and `menu` entries vary.
+
+data:
+  paths: [data/raw/subset_2000.txt]                  # strided subset (scripts/make_subset.py)
+  split_file: splits/main.json        # frozen once: python -m lattice_gnn.splits
+
+training:          # fixed for every run (any key of lattice_gnn.training.DEFAULTS)
+  epochs: 100
+  patience: 20
+  seed: 0
+
+# Hyperparameter ranges. float/int: low, high, optional log; categorical: choices.
+search:
+  lr:           {type: float, low: 1.0e-4, high: 3.0e-3, log: true}
+  weight_decay: {type: float, low: 1.0e-7, high: 1.0e-3, log: true}
+  hidden:       {type: categorical, choices: [64, 128, 256, 512]}
+  layers:       {type: int, low: 2, high: 6}
+  batch_size:   {type: categorical, choices: [32, 64, 128]}
+
+# Hard limits on the agent's retune ranges (lattice_gnn.validate): wider than `search`, so a
+# retune can move outside the starting ranges (e.g. the planted failure where `search` excludes
+# good learning rates), but never to absurd values. float/int: low, high; categorical: choices.
+limits:
+  lr:           {low: 1.0e-5, high: 1.0e-1}
+  weight_decay: {low: 1.0e-9, high: 1.0e-1}
+  hidden:       {choices: [32, 64, 128, 256, 512]}  # cap lifted (see top)
+  layers:       {low: 1, high: 8}
+  batch_size:   {choices: [16, 32, 64, 128, 256]}
+
+# Structural menu: each option is a categorical setting the optimizer may switch.
+# TODO section 7 adds physics_residual and family_balanced_loss here once training
+# supports them.
+menu:
+  augment: [true, false]
+  pd_head: [false, true]    # positive definite by construction (lattice_gnn.model.pd_couplings)
+
+optimizer:
+  sampler_seed: 0
+  objective: loss     # loss | median_percent_error_moduli | median_abs_error_couplings | non_pd_rate
+
+budget:
+  cpu_hours: 22       # CPU-hours per study, summed over runs. Matches Lab Report 3's compute: its
+                      # Optuna study trained 3.6 h (20 runs), and CPU time runs at about 6x clock
+                      # time on this laptop's 8 threads (smoke test 2026-11-24, LOG.md).
+                      # One 100-epoch width-512 run is very roughly 5-8 CPU-hours.
+  round_runs: 5       # agent loop: Optuna runs per round, between agent decisions (worksheet section 6)
+  max_structural_changes: 3   # agent loop: then it must escalate (worksheet section 3)
+  # no_progress: 10   # stop after this many runs without a new best. Off (2026-11-01) so agent
+  #                   # and baseline always use the full budget; set it only for exploratory studies.
+
+# Agent loop (agents/diagnostician/loop.py): after the round that follows a decision, it counts as
+# "improved" only if the round's best run beats the best before it by more than these amounts
+# (worksheet section 3: more than the seed-to-seed spread). From seeds 0 and 1 of main-full and
+# main-full-pd (LOG.md, 2026-11-05): loss gap 0.012 / 0.0035, non-PD rate gap 0.041. Rough
+# (two seeds per setup).
+# Subset (2026-11-13), seeds 0 and 1 on 239 validation lattices: loss gap 0.0077 without pd_head
+# (0.2231 / 0.2308), 0.0232 with it (0.2156 / 0.2388); non-PD 19 / 19 without pd_head (gap 0),
+# 0 / 0 with it. Loss threshold = the larger gap, rounded. The two seeds happened to give the same
+# non-PD count, so the subset gives no usable non-PD spread; the full-catalog 0.04 is kept.
+outcome:
+  min_loss_drop: 0.02      # in the optimizer objective (standardized MSE)
+  min_non_pd_drop: 0.04    # in the non-PD rate
+
+# Stop early only if every threshold is met on the validation families.
+# No spec fixes an accuracy target (agent_design_worksheet.md section 9), so the accuracy
+# thresholds are 0 and never met: studies stop on budget or no progress. Non-PD target is 0.
+thresholds:
+  median_percent_error_moduli: 0.0
+  median_abs_error_couplings: 0.0
+  non_pd_rate: 0.0
+
+# The diagnostician (agents/diagnostician): one claude -p call per decision, no tools.
+agent:
+  name: diagnostician          # .claude/agents/diagnostician.md
+  model: claude-sonnet-5-5     # pinned (agent_design_worksheet.md section 5)
+  effort: high                 # decided 2026-11-05 (Jamie)
+  max_turns: 3
+  retries: 1                   # invalid output: one retry with the errors, then forced escalate

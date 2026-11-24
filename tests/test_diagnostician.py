@@ -97,3 +97,15 @@ def test_failed_option_forces_escalation_without_retry(run):
 def test_prompt_only_makes_no_call(run):
     assert decide(run, LOOP, runner=fake_claude(), prompt_only=True) is None
     assert (run / "agent" / "prompt-0.md").exists() and not (run / "decisions.jsonl").exists()
+
+
+
+def test_failed_call_is_not_a_decision(run):
+    """An error from Claude Code itself (e.g. expired sign-in) stops the run; nothing is logged
+    as a decision, so it can never count as a (forced) escalation."""
+    def runner(command, prompt):
+        return json.dumps({"type": "result", "subtype": "success", "is_error": True, "num_turns": 0,
+                           "result": "Failed to authenticate: OAuth session expired"})
+    with pytest.raises(RuntimeError, match="claude call failed"):
+        decide(run, LOOP, runner=runner)
+    assert read_jsonl(run / "decisions.jsonl") == []

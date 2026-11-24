@@ -35,18 +35,38 @@ def score(result: dict, name: str) -> float:
     return result["overall"][name]
 
 
+def cpu_hours(result: dict) -> float:
+    """CPU-hours one training run took (eval.json `compute`); 0 for runs made before it was recorded."""
+    return (result.get("compute") or {}).get("cpu_hours", 0.0)
+
+
+def budget_left(budget: dict, used: int, cpu_used: float) -> str | None:
+    """None while budget is left, else the reason it is used up. A budget has `runs` (count of
+    training runs), `cpu_hours`, or both; whichever runs out first ends the study. The last run
+    may overshoot `cpu_hours`, since a run's cost is only known once it has finished."""
+    if "runs" not in budget and "cpu_hours" not in budget:
+        raise ValueError("budget needs `runs`, `cpu_hours` or both")
+    if used >= budget.get("runs", math.inf):
+        return f"budget used ({used} runs)"
+    if cpu_used >= budget.get("cpu_hours", math.inf):
+        return f"budget used ({cpu_used:.2f} of {budget['cpu_hours']} CPU-hours, {used} runs)"
+    return None
+
+
 def check_target(result: dict, thresholds: dict, used: int, budget: dict,
-                 since_best: int = 0) -> dict:
+                 since_best: int = 0, cpu_used: float = 0.0) -> dict:
     """continue | stop, with the reason. `result` is the best run's eval.json so far.
 
-    Stops when every threshold is met (success), when the budget of training runs is used
-    up, or after budget["no_progress"] runs in a row without a new best.
+    Stops when every threshold is met (success), when the budget (training runs and/or
+    CPU-hours, see budget_left) is used up, or after budget["no_progress"] runs in a row without
+    a new best.
     """
     missed = [k for k, limit in thresholds.items() if score(result, k) > limit]
     if not missed:
         return {"decision": "stop", "reason": "target met"}
-    if used >= budget["runs"]:
-        return {"decision": "stop", "reason": f"budget used ({used} runs)"}
+    spent = budget_left(budget, used, cpu_used)
+    if spent:
+        return {"decision": "stop", "reason": spent}
     if since_best >= budget.get("no_progress", math.inf):
         return {"decision": "stop", "reason": f"no progress in {since_best} runs"}
     return {"decision": "continue", "reason": "missed: " + ", ".join(missed)}
@@ -83,7 +103,7 @@ def optimize(loop: dict, study_name: str, runs_dir: str | Path = "runs", graphs=
 
     sampler = optuna.samplers.TPESampler(seed=loop["optimizer"]["sampler_seed"])
     study = optuna.create_study(study_name=study_name, direction="minimize", sampler=sampler)
-    trials, best, state = [], None, {"since_best": 0, "check": None}
+    trials, best, state = [], None, {"since_best": 0, "check": None, "cpu": 0.0}
 
     def objective(trial: optuna.Trial) -> float:
         nonlocal best
@@ -94,6 +114,7 @@ def optimize(loop: dict, study_name: str, runs_dir: str | Path = "runs", graphs=
         run_id = train(config, graphs=graphs)
         result = json.loads((study_dir / run_id / "eval.json").read_text())
         value = score(result, objective_name)
+        state["cpu"] += cpu_hours(result)
 
         if best is None or value < best["value"]:
             best = {"number": trial.number, "run_id": run_id, "value": value, "eval": result}
@@ -101,21 +122,22 @@ def optimize(loop: dict, study_name: str, runs_dir: str | Path = "runs", graphs=
         else:
             state["since_best"] += 1
         check = check_target(best["eval"], loop["thresholds"], trial.number + 1, loop["budget"],
-                             state["since_best"])
+                             state["since_best"], state["cpu"])
         state["check"] = check
         trials.append({"number": trial.number, "run_id": run_id, "params": params, "value": value,
                        "best_epoch": result["best_epoch"], "overall": result["overall"],
-                       "non_pd_rate": result["pd"]["non_pd_rate"], "check": check})
+                       "non_pd_rate": result["pd"]["non_pd_rate"], "cpu_hours": cpu_hours(result),
+                       "check": check})
         (study_dir / "trials.json").write_text(json.dumps(
             {"objective": objective_name, "best": {k: best[k] for k in ("number", "run_id", "value")},
-             "trials": trials}, indent=1))
+             "cpu_hours_used": state["cpu"], "trials": trials}, indent=1))
         print(f"trial {trial.number:3d}  {objective_name} {value:.4f}  best {best['value']:.4f}"
               f" (trial {best['number']})  -> {check['decision']}: {check['reason']}")
         if check["decision"] == "stop":
             trial.study.stop()
         return value
 
-    study.optimize(objective, n_trials=loop["budget"]["runs"])
+    study.optimize(objective, n_trials=loop["budget"].get("runs"))   # None: until check_target stops it
     return {"check": state["check"], "best": {k: best[k] for k in ("number", "run_id", "value")}}
 
 

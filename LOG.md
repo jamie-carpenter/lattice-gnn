@@ -1,5 +1,65 @@
 # Running log
 
+## 2026-11-24
+
+**Done**
+- Lab Report 3 feedback: 100/100. The TA endorsed the Lab Report 4 plan (compound planted
+  failures) and asked to also count the budget in CPU-hours.
+- CPU-hour budget:
+  - Each run records `compute` (CPU-hours over all threads, wall hours, threads) in `eval.json`
+    and `history.json`. Standby does not count.
+  - `budget.cpu_hours` and/or `budget.runs`; whichever runs out first stops the study (Optuna
+    baseline and agent loop). A round ends early when the CPU-hours run out; the last run may
+    overshoot.
+  - Validator rule 5: retune / change_structure need `round_runs` x the mean CPU-hours per run so far.
+  - The agent sees each run's CPU-hours and the CPU-hours left; its instructions explain the cost.
+  - `config/loop_lr4.yaml`: the subset study with `cpu_hours: 22` and the width cap lifted (512 back
+    in limits and starting ranges).
+  - 6 new tests; 84 pass.
+- Smoke test on the subset (rule table, 2-3 epochs per run, scratch folder, not kept):
+  - CPU time is about 6x wall time on 8 threads (0.230 CPU-h vs 0.038 h wall for one run).
+  - Width 512 costs 10-50x a width-64 run (2 epochs: 0.16 CPU-h at 512, 0.003-0.007 at 64).
+  - 0.5 CPU-h budget: 26 runs, 13 rounds; stopped when 0.02 CPU-h were left and a round needed
+    about 0.04 (validator forced an escalation).
+- Budget 22 CPU-hours = Lab Report 3's Optuna study (3.6 h of training) x 6.
+
+- Leftover budget: when what is left cannot pay for a full round (runs or CPU-hours), the loop
+  now stops on budget before asking for a decision (`validate.round_shortfall`, shared with rule 5),
+  so a leftover sliver is no longer logged as a forced escalation. 85 tests pass.
+
+- Planted failures (`config/planted.yaml`, `agents/diagnostician/planted.py`,
+  `scripts/run_lr4_study.sh`, 8 tests):
+  - Label faults in training (`label_faults`: moduli x10 on one family, or labels shuffled within
+    one), on copies, so the cached dataset is untouched.
+  - Known cases (answer key checked by code): `collapse` (lr 1e-2 to 1e-1), `units_low_lr`
+    (tet_Z04.8 moduli x10 + lr 1e-5 to 3e-5), `width_trap` (widths 256/512 at lr 5e-4 to
+    1.5e-3, 3 runs per round). Each: agent loop, 10 frozen agent calls + rule table on its
+    round 0, rule-table loop.
+  - Cases with no single correct answer (Jamie): `control` (no fault), `hidden_noise` (labels
+    shuffled in training family tet_Z04.0), `two_causes` (PD off + lr 1e-5 to 5e-5). Round 0,
+    then 10 agent calls + rule table; only unsupported decisions are flagged.
+  - The answer key never enters the agent's input (test).
+- Learning-rate probes (width 128, 100 epochs, PD layer off, subset):
+
+  | lr | Loss | Non-PD | Moduli % | Best epoch / epochs run | CPU-h |
+  |---|---|---|---|---|---|
+  | 1e-1 | 1.009 | 0 | 583 | 19 / 39 | 0.53 |
+  | 3e-2 | 1.008 | 0 | 578 | 4 / 24 | 0.40 |
+  | 5e-3 | 0.873 | 0 | 312 | 81 / 100 | 0.93 |
+  | 1e-5 | 0.542 | 0.042 | 169 | 96 / 100 | 0.97 |
+
+  High lr collapses the model to predicting the mean, which is PD: non-PD predictions come from
+  a partly trained model, not from unstable training. So the planned "divergence non-PD" case
+  became `collapse`, and `two_causes` moved from high to low lr.
+- Failure found: with the Claude Code sign-in expired, every agent call failed and the loop logged
+  it as a forced escalation, so a study could have run on fake decisions. A failed call now
+  stops the run (`agent.decide`, test). Signed in again.
+- Study started 14:28 (`collapse`, terminal); the other five cases queued after it.
+
+**Remaining**
+- Score the study (`python -m agents.diagnostician.planted score runs/planted-*`), failure-mode
+  section, README, Lab Report 4 (due 29 Nov). Optuna baseline on the cases by 9 Dec.
+
 ## 2026-11-15
 
 **Done**

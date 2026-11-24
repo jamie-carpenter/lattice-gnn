@@ -6,6 +6,11 @@ Every run writes its own folder runs/<id>/:
   model.pt      the model with the lowest validation loss
   history.json  loss per epoch
   eval.json     validation report (lattice_gnn.evaluate); the test set is never touched here
+
+history.json and eval.json both carry `compute`: the run's CPU time (process CPU time summed
+over all threads, from building the model to the end of evaluation) and its wall time. The
+study budget counts CPU-hours (config/loop_lr4.yaml). CPU time, unlike wall time, does not grow
+while the laptop is in standby (agent-sub/round-1/trial-007: 39.9 h of wall time, mostly standby).
 """
 from __future__ import annotations
 
@@ -13,6 +18,7 @@ import json
 import math
 import random
 import subprocess
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +32,9 @@ from .augment import random_axis_transform
 from .data import load_dataset
 from .evaluate import evaluate
 from .model import LatticeGNN
-from .splits import apply_split, family_split, load_split, random_split, save_split
+from .splits import apply_split, family, family_split, load_split, random_split, save_split
+
+FAULT_KINDS = ("moduli_log10_shift", "shuffle")
 
 DEFAULTS = {
     "paths": [],             # lattice data file(s) with properties
@@ -43,6 +51,7 @@ DEFAULTS = {
     "patience": 40,          # stop if validation loss hasn't improved for this many epochs
     "augment": True,         # axis-swap augmentation
     "pd_head": False,        # couplings always give a positive definite stiffness (model.pd_couplings)
+    "label_faults": [],      # planted failures only (config/planted.yaml); see plant_label_faults
     "seed": 0,
     "runs_dir": "runs",
     "run_id": None,          # default: timestamp + random suffix
@@ -67,6 +76,37 @@ def seed_everything(seed: int):
     torch.manual_seed(seed)
 
 
+def plant_label_faults(graphs, faults: list[dict]) -> list:
+    """Planted label faults (Lab Report 4 evaluation; never in a real study). Returns a new list;
+    graphs of a faulted family are copies, so the cached dataset is not changed. Each fault is
+    {"family": <name>, "kind": ..., "value": ...}:
+      moduli_log10_shift  add `value` to the six log10 moduli (1.0 = every modulus x10, as in a
+                          units mistake); couplings, and so positive definiteness, are unchanged
+      shuffle             permute the label vectors among the family's lattices (seed `value`),
+                          as if records were misaligned with their geometries
+    """
+    out = list(graphs)
+    for fault in faults:
+        kind = fault["kind"]
+        if kind not in FAULT_KINDS:
+            raise ValueError(f"label fault kind must be one of {FAULT_KINDS}, got {kind!r}")
+        idx = [i for i, g in enumerate(out) if family(g.name) == fault["family"]]
+        if not idx:
+            raise ValueError(f"label fault: no lattices in family {fault['family']!r}")
+        copies = [out[i].clone() for i in idx]
+        if kind == "moduli_log10_shift":
+            for g in copies:
+                g.y[:, :6] += fault["value"]
+        else:
+            order = np.random.default_rng(int(fault["value"])).permutation(len(copies))
+            ys = [g.y.clone() for g in copies]
+            for g, j in zip(copies, order):
+                g.y = ys[j]
+        for i, g in zip(idx, copies):
+            out[i] = g
+    return out
+
+
 def make_split(config: dict, graphs) -> dict:
     if config["split_file"]:
         return load_split(config["split_file"])
@@ -88,6 +128,8 @@ def train(config: dict, graphs=None) -> str:
     seed_everything(config["seed"])
     if graphs is None:
         graphs = load_dataset(config["paths"], rebuild=config["rebuild"])
+    if config["label_faults"]:
+        graphs = plant_label_faults(graphs, config["label_faults"])
     split = make_split(config, graphs)
     save_split(split, run / "split.json")
     if len(graphs) < 10 and not config["split_file"]:
@@ -103,6 +145,7 @@ def train(config: dict, graphs=None) -> str:
     (run / "config.json").write_text(json.dumps(
         {**config, "run_id": run_id, "git_commit": git_commit(), "torch": torch.__version__}, indent=1))
 
+    cpu0, wall0 = time.process_time(), time.perf_counter()
     first = train_set[0]
     model = LatticeGNN(node_dim=first.x.size(1), edge_dim=first.edge_attr.size(1),
                        global_dim=first.u.size(1), out_dim=first.y.size(1),
@@ -148,11 +191,14 @@ def train(config: dict, graphs=None) -> str:
         if epoch - best_epoch >= config["patience"]:
             log(f"Stopping: no improvement for {config['patience']} epochs.")
             break
-    (run / "history.json").write_text(json.dumps({"best_epoch": best_epoch, "epochs": history}, indent=1))
-
     model, _ = LatticeGNN.load(run / "model.pt")
     result = evaluate(model, val_set, "val")
     result["best_epoch"] = best_epoch
+    result["compute"] = compute = {"cpu_hours": (time.process_time() - cpu0) / 3600,
+                                   "wall_hours": (time.perf_counter() - wall0) / 3600,
+                                   "threads": torch.get_num_threads()}
+    (run / "history.json").write_text(json.dumps(
+        {"best_epoch": best_epoch, "compute": compute, "epochs": history}, indent=1))
     (run / "eval.json").write_text(json.dumps(result, indent=1))
     log(f"\nBest model from epoch {best_epoch}, saved to {run}")
     return run_id

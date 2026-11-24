@@ -140,3 +140,15 @@ def test_schema_and_cli(tmp_path, state):
     ok = subprocess.run([sys.executable, "-m", "lattice_gnn.validate", str(tmp_path / "d.json"),
                          str(tmp_path / "s.json")], capture_output=True, text=True)
     assert ok.returncode == 0 and json.loads(ok.stdout)["ok"]
+
+
+def test_rule5_cpu_budget():
+    loop = {**LOOP, "budget": {"cpu_hours": 10.0, "round_runs": 5}}
+    # 5 runs cost 4 h: a round of 5 needs about 4 h, and 6 h are left
+    ok = state_from_loop(loop, structure={"augment": True, "pd_head": False}, runs_used=5, cpu_hours_used=4.0)
+    assert check(RETUNE, ok)["ok"]
+    # 10 runs cost 8 h: 2 h left, a round needs about 4 h
+    short = state_from_loop(loop, structure={"augment": True, "pd_head": False}, runs_used=10, cpu_hours_used=8.0)
+    out = check(RETUNE, short)
+    assert not out["ok"] and any("CPU-hours" in e for e in out["errors"])
+    assert check(ESCALATE, short)["ok"]                            # escalating is always allowed

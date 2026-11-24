@@ -18,6 +18,13 @@ check 3): "improved" if the round's best run beats the best run before the decis
 than `outcome.min_loss_drop` in the objective, or lowers the non-PD rate by more than
 `outcome.min_non_pd_drop`; otherwise "failed". A failed option cannot be proposed again.
 
+Budget: `budget.runs` (training runs), `budget.cpu_hours` (CPU time summed over runs), or both.
+With a CPU-hour budget a round ends early once the budget is used up, so the last round may be
+shorter than `round_runs`; its last run may overshoot the budget (a run's cost is only known at
+the end). The agent sees each run's CPU-hours and the CPU-hours left. When what is left cannot
+pay for another round (validate.round_shortfall), the loop stops on budget without asking for a
+decision, so a leftover sliver is not logged as an escalation (2026-11-24).
+
 Usage (repo root):
     python -m agents.diagnostician.loop --config config/loop.yaml --name agent-0
     python -m agents.diagnostician.loop --name tiny --runs 4 --epochs 2 --approve all
@@ -33,6 +40,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import math
 import shutil
 import sys
 from pathlib import Path
@@ -41,8 +49,9 @@ import optuna
 import yaml
 
 from lattice_gnn.data import load_dataset
-from lattice_gnn.optimize import check_target, score, suggest
+from lattice_gnn.optimize import budget_left, check_target, cpu_hours, score, suggest
 from lattice_gnn.training import git_commit, train
+from lattice_gnn.validate import round_shortfall
 
 from .agent import decide, read_jsonl
 from .rules import decide_rules
@@ -52,8 +61,9 @@ DECIDERS = ("agent", "rules")
 
 
 def run_round(loop: dict, search: dict, structure: dict, folder: Path, round_no: int,
-              first_number: int, n_runs: int, graphs) -> list[dict]:
-    """n_runs training runs over `search` with the structure fixed; one trials.json entry each."""
+              first_number: int, n_runs: int, graphs, cpu_used: float = 0.0) -> list[dict]:
+    """Up to n_runs training runs over `search` with the structure fixed; one trials.json entry
+    each. Stops early once the CPU-hour budget is used up (`cpu_used`: spent before this round)."""
     objective = loop["optimizer"]["objective"]
     sampler = optuna.samplers.TPESampler(seed=loop["optimizer"]["sampler_seed"] + round_no)
     study = optuna.create_study(direction="minimize", sampler=sampler)
@@ -72,7 +82,10 @@ def run_round(loop: dict, search: dict, structure: dict, folder: Path, round_no:
         trials.append({"round": round_no, "number": number, "run_id": f"round-{round_no}/trial-{number:03d}",
                        "params": {**params, **structure}, "value": value,
                        "best_epoch": result["best_epoch"], "overall": result["overall"],
-                       "non_pd_rate": result["pd"]["non_pd_rate"]})
+                       "non_pd_rate": result["pd"]["non_pd_rate"], "cpu_hours": cpu_hours(result)})
+        if budget_left(loop["budget"], first_number + len(trials),
+                       cpu_used + sum(t["cpu_hours"] for t in trials)):
+            trial.study.stop()
         return value
 
     study.optimize(objective_fn, n_trials=n_runs)
@@ -131,11 +144,14 @@ def run_loop(loop: dict, name: str, runs_dir: str | Path = "runs", approve: str 
     structure = {k: v[0] for k, v in loop.get("menu", {}).items()}
     structure.update(loop.get("start_structure") or {})
     trials, best, since_best, pending, round_no = [], None, 0, None, 0
+    if "round_runs" not in budget and "runs" not in budget:
+        raise ValueError("budget needs `round_runs` when it has no `runs`")
 
     while True:
-        n_runs = min(budget.get("round_runs", budget["runs"]), budget["runs"] - len(trials))
-        log(f"round {round_no}: {n_runs} runs, structure {structure}")
-        new = run_round(loop, search, structure, folder, round_no, len(trials), n_runs, graphs)
+        cpu_used = sum(t["cpu_hours"] for t in trials)
+        n_runs = min(budget.get("round_runs", budget.get("runs")), budget.get("runs", math.inf) - len(trials))
+        log(f"round {round_no}: up to {n_runs} runs, structure {structure}")
+        new = run_round(loop, search, structure, folder, round_no, len(trials), n_runs, graphs, cpu_used)
         before = best
         for t in new:
             if best is None or t["value"] < best["value"]:
@@ -145,7 +161,7 @@ def run_loop(loop: dict, name: str, runs_dir: str | Path = "runs", approve: str 
         trials += new
         (folder / "trials.json").write_text(json.dumps(
             {"objective": objective, "best": {k: best[k] for k in ("number", "run_id", "value")},
-             "trials": trials}, indent=1))
+             "cpu_hours_used": sum(t["cpu_hours"] for t in trials), "trials": trials}, indent=1))
         if pending is not None:
             outcome, metrics = judge(before, new, loop.get("outcome", {}))
             _update_decision(folder, pending, outcome=outcome, outcome_metrics=metrics)
@@ -154,10 +170,16 @@ def run_loop(loop: dict, name: str, runs_dir: str | Path = "runs", approve: str 
             pending = None
 
         best_eval = json.loads((folder / best["run_id"] / "eval.json").read_text())
-        check = check_target(best_eval, loop["thresholds"], len(trials), budget, since_best)
+        check = check_target(best_eval, loop["thresholds"], len(trials), budget, since_best,
+                             sum(t["cpu_hours"] for t in trials))
         log(f"  best {objective} {best['value']:.4f} ({best['run_id']}); {check['decision']}: {check['reason']}")
         if check["decision"] == "stop":
             stop = check["reason"]
+            break
+        short = round_shortfall(budget, len(trials), sum(t["cpu_hours"] for t in trials))
+        if short:
+            stop = f"budget used: {short}"
+            log(f"  stop: {stop}")
             break
 
         entry = decide_fn(folder, {**loop, "search": search}, structure=dict(structure))
@@ -182,6 +204,7 @@ def run_loop(loop: dict, name: str, runs_dir: str | Path = "runs", approve: str 
         round_no += 1
 
     summary = {"stop": stop, "runs_used": len(trials), "rounds": round_no + 1,
+               "cpu_hours_used": sum(t["cpu_hours"] for t in trials),
                "best": {k: best[k] for k in ("number", "run_id", "value")},
                "structure": structure, "search": search,
                "decisions": len(read_jsonl(folder / "decisions.jsonl"))}
