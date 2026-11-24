@@ -1,6 +1,7 @@
 """Draw the agent-design figure for the lab reports (template item C1).
 
 Usage:
+    python scripts/make_design_figure.py --report 4   # Lab Report 4 -> reports/figures/agent_design_lr4.{pdf,png}
     python scripts/make_design_figure.py              # Lab Report 3 -> reports/figures/agent_design_lr3.{pdf,png}
     python scripts/make_design_figure.py --report 2   # Lab Report 2 -> reports/figures/agent_design.{pdf,png}
 
@@ -94,7 +95,8 @@ def check_overflow(fig, ax):
 
 
 def main(report: int = 3):
-    lr3 = report == 3
+    lr3 = report >= 3
+    lr4 = report == 4
     ok = "finished" if lr3 else "built"
     fig, ax = plt.subplots(figsize=(7.0, 6.0))
     ax.set_xlim(-0.1, 12.75)
@@ -110,11 +112,13 @@ def main(report: int = 3):
     box(ax, LX, rows[0], LW, H, TOOL, "Tool 1 · Optimizer",
         "Optuna (TPE): 5 training\nruns per round", ok)
     box(ax, LX, rows[1], LW, H, TOOL, "Tool 2 · Train",
+        "train(config) → run_id;\nrecords its CPU-hours" if lr4 else
         "train(config) → run_id;\nseeded, locked split", ok)
     box(ax, LX, rows[2], LW, H, TOOL, "Tool 3 · Evaluate",
         "per-family errors and\nPD check → eval.json", ok)
     if lr3:
         box(ax, LX, rows[3], LW, H, TOOL, "Tool 4 · Checks",
+            "improved? (seed spread);\nCPU-hours for a round?" if lr4 else
             "decision improved?\n(seed spread); budget", ok)
     else:
         box(ax, LX, rows[3], LW, H, TOOL, "Tool 4 · Target check",
@@ -132,7 +136,8 @@ def main(report: int = 3):
         "Decides one of:\n(a) retune → new ranges\n(b) change structure → one\n"
         "menu option, kept afterwards\n(c) escalate → human", ok if lr3 else "planned")
     box(ax, CX, 0.75 if lr3 else 0.9, CW, 1.65 if lr3 else 1.4, TOOL, "Tool 5 · Validator",
-        "checks schema, menu option\nand budget" + ("" if lr3 else " (planned)"), ok if lr3 else None)
+        "checks schema, menu option\nand " + ("CPU-hour budget" if lr4 else "budget")
+        + ("" if lr3 else " (planned)"), ok if lr3 else None)
 
     gap_l = (LX + LW + CX) / 2
     arrow(ax, (LX + LW, rows[3] + H / 2), (CX, rows[3] + H / 2), "continue",
@@ -146,7 +151,9 @@ def main(report: int = 3):
         box(ax, RX, 6.4, RW, 1.9, HUMAN, "Human gate",
             "approves structural\nchanges; answers\nescalations", ok)
         box(ax, RX, 3.3, RW, 2.4, TOOL, "Optuna baseline",
-            "hyperparameters and\nmenu searched jointly,\nsame 20-run budget", ok)
+            "hyperparameters and\nmenu searched jointly,\n"
+            + ("same 22 CPU-hours" if lr4 else "same 20-run budget"),
+            "planned for planted" if lr4 else ok)
         box(ax, RX, 0.55, RW, 2.4, TOOL, "Rule-table baseline",
             "rule table replaces\nthe LLM in the loop:\nnon-PD → PD layer,\nelse zoom on best", ok)
     else:
@@ -166,14 +173,21 @@ def main(report: int = 3):
     ax.plot([0, 12.65], [-0.42, -0.42], color=MUTED, lw=0.6, ls=(0, (2, 2)))
     ax.text(12.65, -0.34, "outside the research loop", ha="right", va="bottom", fontsize=FS_LABEL,
             color=MUTED, style="italic")
-    # The literature (retrieval) agent from Labs 4/5, with its own human check.
-    lit_w, check_x = 4.6, 5.55
-    box(ax, LX, -2.3, lit_w, 1.65, {**LLM, "ls": (0, (4, 3))}, "Literature agent (support)",
-        "retrieval over my own paper corpus;\nreturns claims with page citations", ok)
-    box(ax, check_x, -2.3, CX + CW - check_x, 1.65, HUMAN, "Human check",
-        "verifies each page\ncitation by hand")
-    arrow(ax, (LX + lit_w, -1.475), (check_x, -1.475), "claims",
-          label_xy=((LX + lit_w + check_x) / 2, -1.27))
+    if lr4:
+        # The planted-failure harness drives the loop from outside and scores it in code.
+        box(ax, LX, -2.3, 4.6, 1.65, TOOL, "Planted-failure harness",
+            "injects faults; scores decisions in\ncode against a hidden answer key", "built; study running")
+        box(ax, 5.0, -2.3, CX + CW - 5.0, 1.65, {**LLM, "ls": (0, (4, 3))}, "Literature agent",
+            "support; citations\nchecked by hand", ok)
+    else:
+        # The literature (retrieval) agent from Labs 4/5, with its own human check.
+        lit_w, check_x = 4.6, 5.55
+        box(ax, LX, -2.3, lit_w, 1.65, {**LLM, "ls": (0, (4, 3))}, "Literature agent (support)",
+            "retrieval over my own paper corpus;\nreturns claims with page citations", ok)
+        box(ax, check_x, -2.3, CX + CW - check_x, 1.65, HUMAN, "Human check",
+            "verifies each page\ncitation by hand")
+        arrow(ax, (LX + lit_w, -1.475), (check_x, -1.475), "claims",
+              label_xy=((LX + lit_w + check_x) / 2, -1.27))
 
     # Legend.
     for i, (style, label) in enumerate([(LLM, "LLM agent"), (TOOL, "deterministic tool / code"),
@@ -185,7 +199,7 @@ def main(report: int = 3):
 
     check_overflow(fig, ax)
     OUT.mkdir(parents=True, exist_ok=True)
-    stem = "agent_design_lr3" if lr3 else "agent_design"
+    stem = "agent_design_lr4" if lr4 else "agent_design_lr3" if lr3 else "agent_design"
     fig.savefig(OUT / f"{stem}.pdf", bbox_inches="tight")
     fig.savefig(OUT / f"{stem}.png", dpi=200, bbox_inches="tight")
     print(f"Saved {OUT / stem}.pdf and .png")
@@ -193,5 +207,5 @@ def main(report: int = 3):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--report", type=int, choices=(2, 3), default=3)
+    parser.add_argument("--report", type=int, choices=(2, 3, 4), default=3)
     main(parser.parse_args().report)
