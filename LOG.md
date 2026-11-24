@@ -55,6 +55,12 @@
   it as a forced escalation, so a study could have run on fake decisions. A failed call now
   stops the run (`agent.decide`, test). Signed in again.
 - Study started 14:28 (`collapse`, terminal); the other five cases queued after it.
+- README rewritten (setup, sign-in check, loop, budgets, planted study, scoring); Lab Report 4
+  draft `reports/lab_report_4.tex` (results marked REWORK).
+- Demo deck `reports/lab_report_4_demo.pptx`, built from the Lab Report 3 deck by
+  `scripts/make_lr4_deck.py`; design figure `scripts/make_design_figure.py --report 4`; probe
+  figure `scripts/make_lr4_figures.py` (probe runs kept in `runs/probe-lr/`). Results slides
+  marked REWORK.
 
 **Remaining**
 - Score the study (`python -m agents.diagnostician.planted score runs/planted-*`), failure-mode
