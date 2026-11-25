@@ -62,6 +62,12 @@
   figure `scripts/make_lr4_figures.py` (probe runs kept in `runs/probe-lr/`). Results slides
   marked REWORK.
 
+- Study interrupted 17:41: the Claude app restarted and closed its terminal tabs, which killed
+  `planted-collapse-agent` during round 2 (10 runs finished, 13.0 of 22 CPU-hours, 2 decisions:
+  retune lr to [1e-4, 1e-2], improved 1.008 -> 0.288; then PD layer on). Kept as an interrupted
+  loop; its first decision and round 0 are complete. Relaunched 17:51 as a separate Windows
+  process (outside the app), from `collapse` repeats onwards.
+
 **Remaining**
 - Score the study (`python -m agents.diagnostician.planted score runs/planted-*`), failure-mode
   section, README, Lab Report 4 (due 29 Nov). Optuna baseline on the cases by 9 Dec.
